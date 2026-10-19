@@ -187,6 +187,24 @@
   50% { opacity: 1; filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.8)); }
 }
 
+/* Premove highlights (Subzero neon cyan / purple) */
+.square.premove-from::before,
+.square.premove-to::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(168, 85, 247, 0.42) !important;
+  box-shadow: inset 0 0 14px rgba(168, 85, 247, 0.7);
+  pointer-events: none;
+  z-index: 2;
+  animation: premovePulse 1.4s infinite ease-in-out;
+}
+
+@keyframes premovePulse {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.9)); }
+}
+
 /* Right-click square highlights (Chess.com / Lichess style) */
 .square.highlight-green::before {
   content: '';

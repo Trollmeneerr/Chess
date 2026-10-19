@@ -8,7 +8,10 @@ const ChessBoard = {
   boardEl: null,
   fen: AppConfig.INITIAL_FEN,
   orientation: 'white', // 'white' or 'black'
+  playerColor: 'white', // 'white' or 'black'
   interactive: true,
+  allowPremove: true,
+  premove: null, // { from, to, promotion }
   selectedSquare: null,
   legalMoves: [],
   lastMove: null,
@@ -27,14 +30,33 @@ const ChessBoard = {
    */
   init(containerId, options = {}) {
     this.containerId = containerId;
+    this.playerColor = options.playerColor || options.orientation || 'white';
     this.orientation = options.orientation || 'white';
     this.interactive = options.interactive !== false;
+    this.allowPremove = options.allowPremove !== false;
     this.onMove = options.onMove || null;
     this.fen = options.fen || AppConfig.INITIAL_FEN;
+    this.premove = null;
     this.arrows = [];
     this.highlightedSquares.clear();
     this.render();
     this.bindEvents();
+  },
+
+  /**
+   * Check if it is currently this player's active turn
+   */
+  isMyTurn() {
+    const turn = this.getTurn();
+    return (this.playerColor === 'white' && turn === 'w') || (this.playerColor === 'black' && turn === 'b');
+  },
+
+  /**
+   * Check if a piece belongs to the player
+   */
+  isPlayerPiece(piece) {
+    if (!piece) return false;
+    return this.playerColor === 'white' ? piece === piece.toUpperCase() : piece === piece.toLowerCase();
   },
 
   /**
@@ -70,6 +92,12 @@ const ChessBoard = {
 
         // Selected
         if (sq === this.selectedSquare) classes += ' selected';
+
+        // Premove highlights
+        if (this.premove) {
+          if (sq === this.premove.from) classes += ' premove-from';
+          if (sq === this.premove.to) classes += ' premove-to';
+        }
 
         // Legal moves
         if (this.legalMoves.includes(sq)) {
@@ -128,7 +156,7 @@ const ChessBoard = {
   },
 
   /**
-   * Update the board with a new FEN
+   * Update the board with a new FEN. Automatically executes queued premove if legal!
    */
   update(fen, options = {}) {
     this.fen = fen;
@@ -138,8 +166,49 @@ const ChessBoard = {
     this.selectedSquare = null;
     this.legalMoves = [];
     this.clearAnnotations();
+
+    // Check if an existing premove can now execute
+    if (this.premove && this.isMyTurn()) {
+      const pm = this.premove;
+      this.premove = null;
+
+      let isLegal = false;
+      if (typeof window.Chess === 'function') {
+        try {
+          const testChess = new window.Chess(fen);
+          const executed = testChess.move({ from: pm.from, to: pm.to, promotion: pm.promotion || 'q' });
+          if (executed) isLegal = true;
+        } catch (e) {
+          isLegal = false;
+        }
+      } else {
+        isLegal = true;
+      }
+
+      this.render();
+      this.bindEvents();
+
+      if (isLegal && this.onMove) {
+        // Instantaneous premove dispatch (0ms delay)
+        setTimeout(() => {
+          if (this.onMove) this.onMove(pm);
+        }, 10);
+      }
+      return;
+    }
+
     this.render();
     this.bindEvents();
+  },
+
+  /**
+   * Cancel any pending premove
+   */
+  clearPremove() {
+    this.premove = null;
+    this.boardEl?.querySelectorAll('.premove-from, .premove-to').forEach(el => {
+      el.classList.remove('premove-from', 'premove-to');
+    });
   },
 
   /**
@@ -229,33 +298,72 @@ const ChessBoard = {
 
     const square = squareEl.dataset.square;
     const piece = this.getPieceAt(square);
-    const turn = this.getTurn();
+    const myTurn = this.isMyTurn();
 
-    if (this.selectedSquare) {
-      if (this.legalMoves.includes(square)) {
-        // Make move
-        this.tryMove(this.selectedSquare, square);
+    if (myTurn) {
+      const turn = this.getTurn();
+      if (this.selectedSquare) {
+        if (this.legalMoves.includes(square)) {
+          // Make move
+          this.tryMove(this.selectedSquare, square);
+        } else if (piece && this.isOwnPiece(piece, turn)) {
+          // Select different piece
+          this.selectSquare(square);
+        } else {
+          // Deselect
+          this.selectedSquare = null;
+          this.legalMoves = [];
+          this.render();
+          this.bindEvents();
+        }
       } else if (piece && this.isOwnPiece(piece, turn)) {
-        // Select different piece
         this.selectSquare(square);
-      } else {
-        // Deselect
-        this.selectedSquare = null;
-        this.legalMoves = [];
+      }
+    } else if (this.allowPremove) {
+      // Premove interaction when waiting for opponent
+      if (this.selectedSquare) {
+        if (square !== this.selectedSquare) {
+          const fromPiece = this.getPieceAt(this.selectedSquare);
+          const isPawn = fromPiece?.toLowerCase() === 'p';
+          const targetRank = parseInt(square[1]);
+          const isPromo = isPawn && (targetRank === 8 || targetRank === 1);
+
+          this.premove = {
+            from: this.selectedSquare,
+            to: square,
+            promotion: isPromo ? 'q' : undefined
+          };
+          this.selectedSquare = null;
+          this.legalMoves = [];
+          this.render();
+          this.bindEvents();
+        } else {
+          this.clearPremove();
+          this.selectedSquare = null;
+          this.legalMoves = [];
+          this.render();
+          this.bindEvents();
+        }
+      } else if (piece && this.isPlayerPiece(piece)) {
+        this.selectedSquare = square;
+        this.legalMoves = this.getBasicLegalMoves(square, true);
         this.render();
         this.bindEvents();
       }
-    } else if (piece && this.isOwnPiece(piece, turn)) {
-      this.selectSquare(square);
     }
   },
 
   handleMouseDown(e, squareEl) {
     const square = squareEl.dataset.square;
 
-    // Right-click: Start arrow drawing or square highlight
+    // Right-click: Start arrow drawing or cancel premove
     if (e.button === 2) {
       e.preventDefault();
+      if (this.premove) {
+        this.clearPremove();
+        this.render();
+        this.bindEvents();
+      }
       this.rightDrag = {
         from: square,
         startX: e.clientX,
@@ -264,14 +372,17 @@ const ChessBoard = {
       return;
     }
 
-    // Left-click: Clear annotations
+    // Left-click: Clear annotations & start drag
     if (e.button === 0) {
       this.clearAnnotations();
 
       const piece = this.getPieceAt(square);
-      const turn = this.getTurn();
+      const myTurn = this.isMyTurn();
+      const canDrag = myTurn
+        ? (piece && this.isOwnPiece(piece, this.getTurn()))
+        : (this.allowPremove && piece && this.isPlayerPiece(piece));
 
-      if (piece && this.isOwnPiece(piece, turn)) {
+      if (canDrag) {
         this.dragging = {
           from: square,
           piece,
@@ -338,8 +449,11 @@ const ChessBoard = {
       this.dragPieceEl.innerHTML = AppConfig.getPieceSVG(this.dragging.piece);
       document.body.appendChild(this.dragPieceEl);
 
-      // Select the source square to show legal moves
-      this.selectSquare(this.dragging.from);
+      // Select source square to show legal move destinations
+      this.selectedSquare = this.dragging.from;
+      this.legalMoves = this.getBasicLegalMoves(this.dragging.from, !this.isMyTurn());
+      this.render();
+      this.bindEvents();
     }
 
     if (this.dragPieceEl) {
@@ -361,9 +475,27 @@ const ChessBoard = {
       const squareEl = el?.closest('.square');
       if (squareEl) {
         const targetSquare = squareEl.dataset.square;
-        if (this.legalMoves.includes(targetSquare)) {
-          this.tryMove(this.dragging.from, targetSquare);
-        } else {
+        if (this.isMyTurn()) {
+          if (this.legalMoves.includes(targetSquare)) {
+            this.tryMove(this.dragging.from, targetSquare);
+          } else {
+            this.selectedSquare = null;
+            this.legalMoves = [];
+            this.render();
+            this.bindEvents();
+          }
+        } else if (this.allowPremove && targetSquare !== this.dragging.from) {
+          // Set premove from drag drop
+          const piece = this.dragging.piece;
+          const isPawn = piece?.toLowerCase() === 'p';
+          const targetRank = parseInt(targetSquare[1]);
+          const isPromo = isPawn && (targetRank === 8 || targetRank === 1);
+
+          this.premove = {
+            from: this.dragging.from,
+            to: targetSquare,
+            promotion: isPromo ? 'q' : undefined
+          };
           this.selectedSquare = null;
           this.legalMoves = [];
           this.render();
@@ -375,9 +507,9 @@ const ChessBoard = {
     this.dragging = null;
   },
 
-  selectSquare(square) {
+  selectSquare(square, isPremove = false) {
     this.selectedSquare = square;
-    this.legalMoves = this.getBasicLegalMoves(square);
+    this.legalMoves = this.getBasicLegalMoves(square, isPremove);
     this.render();
     this.bindEvents();
   },
@@ -482,10 +614,16 @@ const ChessBoard = {
   /**
    * Basic legal move computation (client-side preview, server validates)
    */
-  getBasicLegalMoves(fromSquare) {
+  getBasicLegalMoves(fromSquare, isPremove = false) {
     if (typeof window.Chess === 'function') {
       try {
-        const c = new window.Chess(this.fen);
+        let fenToUse = this.fen;
+        if (isPremove) {
+          const parts = this.fen.split(' ');
+          parts[1] = this.playerColor === 'white' ? 'w' : 'b';
+          fenToUse = parts.join(' ');
+        }
+        const c = new window.Chess(fenToUse);
         const moves = c.moves({ square: fromSquare, verbose: true });
         return moves.map(m => m.to);
       } catch (err) {}

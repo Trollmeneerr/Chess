@@ -36,13 +36,20 @@ const App = {
     document.querySelector('.sidebar-logo')?.addEventListener('click', () => {
       this.navigateTo('lobby');
     });
+
+    // Clicking avatar/user panel navigates to profile
+    document.getElementById('user-panel')?.addEventListener('click', (e) => {
+      // Don't navigate if logout button was clicked
+      if (e.target.closest('#btn-logout')) return;
+      this.navigateTo('profile');
+    });
   },
 
   handleRoute() {
     const hash = window.location.hash.replace(/^#\/?/, '');
     const pathname = window.location.pathname.replace(/^\//, '');
 
-    // Check direct URL path e.g. /play/inv_12345
+    // Check direct URL path e.g. /play/inv_12345 or /profile/player1
     let route = hash || pathname || 'lobby';
     let params = null;
 
@@ -51,6 +58,11 @@ const App = {
       route = 'play';
     } else if (route.startsWith('play')) {
       route = 'play';
+    } else if (route.startsWith('profile/')) {
+      params = decodeURIComponent(route.split('profile/')[1]);
+      route = 'profile';
+    } else if (route.startsWith('profile')) {
+      route = 'profile';
     }
 
     this.renderPage(route, params);
@@ -97,6 +109,9 @@ const App = {
         break;
       case 'analysis':
         AnalysisPage.render(params || {});
+        break;
+      case 'profile':
+        ProfilePage.render(params);
         break;
       default:
         LobbyPage.render();

@@ -37,24 +37,57 @@ const PlayPage = {
           <h2>Create Match</h2>
 
           <div class="form-group">
-            <label class="form-label">Time Control</label>
+            <label class="form-label">Time Control & Increment</label>
             <div class="time-controls">
-              <button class="time-control-btn" data-tc="bullet">
+              <button class="time-control-btn" data-tc="bullet_1_1">
                 <span class="tc-name">Bullet</span>
-                <span class="tc-detail">1 min</span>
+                <span class="tc-detail">1 min + 1s</span>
               </button>
-              <button class="time-control-btn" data-tc="blitz">
+              <button class="time-control-btn active" data-tc="blitz_3_2">
                 <span class="tc-name">Blitz</span>
                 <span class="tc-detail">3 min + 2s</span>
+                <span class="badge badge-accent" style="font-size:10px;margin-top:2px;">Popular</span>
               </button>
-              <button class="time-control-btn active" data-tc="rapid">
+              <button class="time-control-btn" data-tc="blitz_5_3">
+                <span class="tc-name">Blitz</span>
+                <span class="tc-detail">5 min + 3s</span>
+              </button>
+              <button class="time-control-btn" data-tc="rapid_10_0">
                 <span class="tc-name">Rapid</span>
                 <span class="tc-detail">10 min</span>
+              </button>
+              <button class="time-control-btn" data-tc="rapid_15_10">
+                <span class="tc-name">Rapid</span>
+                <span class="tc-detail">15 min + 10s</span>
+              </button>
+              <button class="time-control-btn" data-tc="custom">
+                <span class="tc-name">Custom</span>
+                <span class="tc-detail">Set M + S</span>
               </button>
               <button class="time-control-btn" data-tc="untimed">
                 <span class="tc-name">Untimed</span>
                 <span class="tc-detail">No clock</span>
               </button>
+            </div>
+
+            <!-- Custom Time Inputs -->
+            <div id="custom-time-panel" class="custom-time-row glass-panel mt-2 hidden" style="padding:12px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
+              <div style="flex:1;min-width:130px;">
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">Minutes per side</label>
+                <input type="number" id="custom-minutes" class="form-input" min="1" max="180" value="3" style="width:100%;">
+              </div>
+              <div style="flex:1;min-width:130px;">
+                <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">+ Seconds per move (Increment)</label>
+                <input type="number" id="custom-increment" class="form-input" min="0" max="60" value="2" style="width:100%;">
+              </div>
+              <div style="width:100%;display:flex;gap:6px;align-items:center;">
+                <span style="font-size:11px;color:var(--text-dim);">Quick Increments:</span>
+                <button type="button" class="btn btn-outline btn-sm quick-inc" data-inc="0">+0s</button>
+                <button type="button" class="btn btn-outline btn-sm quick-inc" data-inc="1">+1s</button>
+                <button type="button" class="btn btn-outline btn-sm quick-inc" data-inc="2">+2s</button>
+                <button type="button" class="btn btn-outline btn-sm quick-inc" data-inc="3">+3s</button>
+                <button type="button" class="btn btn-outline btn-sm quick-inc" data-inc="5">+5s</button>
+              </div>
             </div>
           </div>
 
@@ -82,11 +115,26 @@ const PlayPage = {
 
     // Bind setup event listeners
     const tcBtns = main.querySelectorAll('.time-control-btn');
+    const customPanel = document.getElementById('custom-time-panel');
+
     tcBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         tcBtns.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         this.selectedTimeControl = btn.dataset.tc;
+        if (btn.dataset.tc === 'custom') {
+          customPanel?.classList.remove('hidden');
+        } else {
+          customPanel?.classList.add('hidden');
+        }
+      });
+    });
+
+    // Quick increment shortcuts
+    main.querySelectorAll('.quick-inc').forEach(qBtn => {
+      qBtn.addEventListener('click', () => {
+        const incInput = document.getElementById('custom-increment');
+        if (incInput) incInput.value = qBtn.dataset.inc;
       });
     });
 
@@ -107,9 +155,16 @@ const PlayPage = {
     if (btn) btn.disabled = true;
 
     try {
+      let tcToSend = this.selectedTimeControl || 'blitz_3_2';
+      if (tcToSend === 'custom') {
+        const min = parseInt(document.getElementById('custom-minutes')?.value) || 3;
+        const inc = parseInt(document.getElementById('custom-increment')?.value) || 2;
+        tcToSend = `custom_${min}_${inc}`;
+      }
+
       const res = await Api.post('/games/create', {
         game_type: 'pvp',
-        time_control: this.selectedTimeControl,
+        time_control: tcToSend,
         color_preference: this.selectedColor
       });
 
@@ -316,11 +371,13 @@ const PlayPage = {
     const userIsWhite = playerRole === 'white';
     const orientation = playerRole === 'black' ? 'black' : 'white';
 
-    // Initialize interactive board
+    // Initialize interactive board with full premove support
     ChessBoard.init('board-container', {
       orientation,
+      playerColor: playerRole === 'black' ? 'black' : 'white',
       fen: data.fen,
       interactive: playerRole !== 'spectator' && !data.result,
+      allowPremove: playerRole !== 'spectator' && !data.result,
       onMove: (move) => {
         this.socket.emit('move', { invite_code: inviteCode, move });
       }
@@ -463,12 +520,29 @@ const PlayPage = {
     clearInterval(this.clockInterval);
     this.playSound('game_over');
 
-    const isWinner = (data.winner === 'white' && this.currentGame?.role === 'white') ||
-                     (data.winner === 'black' && this.currentGame?.role === 'black');
+    const userIsWhite = this.currentGame?.role === 'white';
+    const isWinner = (data.winner === 'white' && userIsWhite) ||
+                     (data.winner === 'black' && !userIsWhite);
     const isDraw = data.winner === 'draw' || data.result === '1/2-1/2';
 
     let title = isDraw ? 'Draw Game' : (isWinner ? 'Victory!' : 'Defeat');
     let subtitle = `Result: ${data.result} (${data.reason || 'Concluded'})`;
+
+    const eloChange = userIsWhite ? data.whiteEloChange : data.blackEloChange;
+    const newElo = userIsWhite ? data.newWhiteElo : data.newBlackElo;
+
+    if (Auth.currentUser && newElo) {
+      Auth.currentUser.elo_rating = newElo;
+      Auth.updateUI();
+    }
+
+    let eloHtml = '';
+    if (eloChange !== undefined && eloChange !== null && eloChange !== 0) {
+      const isPositive = eloChange > 0;
+      eloHtml = `<div class="elo-change ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${eloChange} ELO (${newElo || ''})</div>`;
+    } else if (isDraw) {
+      eloHtml = `<div class="elo-change neutral">+0 ELO</div>`;
+    }
 
     const boardWrap = document.querySelector('.board-wrapper');
     if (boardWrap) {
@@ -479,6 +553,7 @@ const PlayPage = {
           <div class="game-over-icon">${isDraw ? '🤝' : (isWinner ? '👑' : '💔')}</div>
           <div class="game-over-title">${title}</div>
           <div class="game-over-subtitle">${subtitle}</div>
+          ${eloHtml}
           <div class="game-over-actions">
             <button class="btn btn-primary" id="btn-review-game">Game Review</button>
             <button class="btn btn-ghost" onclick="App.navigateTo('play')">New Match</button>

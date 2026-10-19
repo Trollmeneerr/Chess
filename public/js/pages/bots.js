@@ -281,8 +281,10 @@ const BotsPage = {
 
       ChessBoard.init('board-container', {
         orientation: data.playerColor,
+        playerColor: data.playerColor,
         fen: data.fen,
         interactive: true,
+        allowPremove: true,
         onMove: (move) => {
           this.socket.emit('move', { game_id: data.gameId, move });
         }

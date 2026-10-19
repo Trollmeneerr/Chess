@@ -54,7 +54,7 @@ const LeaderboardPage = {
         const avatar = AppConfig.AVATARS[(p.avatar_id || 1) - 1] || '👤';
 
         rows += `
-          <tr>
+          <tr style="cursor:pointer;" onclick="App.navigateTo('profile', '${p.username}')" title="View ${p.username}'s Profile">
             <td class="leaderboard-rank ${rankClass}">#${rank}</td>
             <td>
               <div class="leaderboard-player">

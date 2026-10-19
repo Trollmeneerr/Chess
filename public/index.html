@@ -60,6 +60,10 @@
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
           <span>Ranks</span>
         </button>
+        <button class="nav-item" data-page="profile" id="nav-profile">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+          <span>Profile</span>
+        </button>
       </div>
 
       <!-- Quick External Links to Website and Panel -->
@@ -138,6 +142,14 @@
     </div>
   </div>
 
+  <!-- Game Replay Modal (Watch back saved matches) -->
+  <div id="game-replay-modal" class="modal-overlay hidden">
+    <div class="modal glass-panel" style="max-width: 820px;">
+      <button class="modal-close" id="replay-modal-close">&times;</button>
+      <div id="replay-modal-content"></div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="/js/lib/chess.min.js"></script>
   <script src="/js/lib/socket.io.min.js"></script>
@@ -152,6 +164,7 @@
   <script src="/js/pages/puzzles.js"></script>
   <script src="/js/pages/leaderboard.js"></script>
   <script src="/js/pages/analysis.js"></script>
+  <script src="/js/pages/profile.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>
