@@ -5,14 +5,204 @@ const express = require('express');
 const router = express.Router();
 const { Chess } = require('chess.js');
 const stockfish = require('../engine/stockfish');
-const { authMiddleware } = require('../middleware/auth');
 const db = require('../db');
+const { v4: uuidv4 } = require('uuid');
+const { optionalAuth } = require('../middleware/auth');
+const { getBotByElo } = require('../engine/bots');
 
-// POST /api/analysis/game — Analyze a full game PGN
-router.post('/game', authMiddleware, async (req, res) => {
+// GET /api/analysis/game/:identifier — Retrieve stored review from database for any node or client
+router.get('/game/:identifier', optionalAuth, async (req, res) => {
   try {
-    const { pgn, invite_code } = req.body;
-    if (!pgn) return res.status(400).json({ error: 'PGN required' });
+    const { identifier } = req.params;
+    let game = await db.get(
+      `SELECT g.*, 
+              w.username AS white_username, w.avatar_id AS white_avatar, w.elo_rating AS white_elo,
+              b.username AS black_username, b.avatar_id AS black_avatar, b.elo_rating AS black_elo
+       FROM games g
+       LEFT JOIN users w ON g.white_id = w.id
+       LEFT JOIN users b ON g.black_id = b.id
+       WHERE g.invite_code = ? OR g.id = ?`,
+      [identifier, isNaN(identifier) ? -1 : parseInt(identifier)]
+    );
+
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found in database' });
+    }
+
+    let parsedAnalysis = null;
+    if (game.analysis_json) {
+      try {
+        parsedAnalysis = typeof game.analysis_json === 'string'
+          ? JSON.parse(game.analysis_json)
+          : game.analysis_json;
+      } catch (e) {
+        console.warn('[Analysis] Failed to parse analysis_json for game', game.invite_code);
+      }
+    }
+
+    // Resolve opponent/players
+    let opponentName = 'Unknown';
+    let opponentAvatar = 1;
+    let opponentElo = null;
+
+    if (game.game_type === 'bot') {
+      const bot = getBotByElo(game.bot_elo);
+      opponentName = bot.name;
+      opponentAvatar = bot.avatar;
+      opponentElo = bot.elo;
+    }
+
+    res.json({
+      success: true,
+      id: game.id,
+      invite_code: game.invite_code,
+      game_type: game.game_type,
+      time_control: game.time_control,
+      bot_elo: game.bot_elo,
+      result: game.result,
+      pgn: game.pgn,
+      created_at: game.created_at,
+      has_analysis: Boolean(parsedAnalysis),
+      analysis: parsedAnalysis,
+      cached: Boolean(parsedAnalysis),
+      white_player: {
+        id: game.white_id,
+        username: game.white_username || (game.game_type === 'bot' && !game.white_id ? opponentName : 'Player 1'),
+        avatar: game.white_avatar || 1,
+        elo: game.white_elo
+      },
+      black_player: {
+        id: game.black_id,
+        username: game.black_username || (game.game_type === 'bot' && !game.black_id ? opponentName : 'Player 2'),
+        avatar: game.black_avatar || 1,
+        elo: game.black_elo
+      }
+    });
+  } catch (err) {
+    console.error('[Analysis] Fetch error:', err);
+    res.status(500).json({ error: 'Failed to retrieve analysis from database' });
+  }
+});
+
+// GET /api/analysis/stored — List all matches in database with completed analysis (for nodes and dashboard)
+router.get('/stored', optionalAuth, async (req, res) => {
+  try {
+    const rows = await db.all(
+      `SELECT g.id, g.invite_code, g.white_id, g.black_id, g.game_type, g.time_control,
+              g.bot_elo, g.result, g.created_at, g.analysis_json,
+              w.username AS white_username, w.avatar_id AS white_avatar,
+              b.username AS black_username, b.avatar_id AS black_avatar
+       FROM games g
+       LEFT JOIN users w ON g.white_id = w.id
+       LEFT JOIN users b ON g.black_id = b.id
+       WHERE g.analysis_json IS NOT NULL AND g.analysis_json != ''
+       ORDER BY g.created_at DESC LIMIT 50`
+    );
+
+    const stored = rows.map(g => {
+      let whiteAcc = null;
+      let blackAcc = null;
+      let moveCount = 0;
+      try {
+        const parsed = typeof g.analysis_json === 'string' ? JSON.parse(g.analysis_json) : g.analysis_json;
+        whiteAcc = parsed.whiteAccuracy || null;
+        blackAcc = parsed.blackAccuracy || null;
+        moveCount = parsed.moves?.length ? Math.ceil(parsed.moves.length / 2) : 0;
+      } catch (e) {}
+
+      let botName = null;
+      if (g.game_type === 'bot') {
+        botName = getBotByElo(g.bot_elo)?.name || 'AI Bot';
+      }
+
+      return {
+        id: g.id,
+        invite_code: g.invite_code,
+        game_type: g.game_type,
+        time_control: g.time_control,
+        result: g.result,
+        white_name: g.white_username || (g.game_type === 'bot' && !g.white_id ? botName : 'Player 1'),
+        black_name: g.black_username || (g.game_type === 'bot' && !g.black_id ? botName : 'Player 2'),
+        white_accuracy: whiteAcc,
+        black_accuracy: blackAcc,
+        moves: moveCount,
+        created_at: g.created_at
+      };
+    });
+
+    res.json({ success: true, count: stored.length, games: stored });
+  } catch (err) {
+    console.error('[Analysis] Stored list error:', err);
+    res.status(500).json({ error: 'Failed to list stored analyses' });
+  }
+});
+
+// POST /api/analysis/store — Directly save/update analysis JSON from external nodes or workers
+router.post('/store', optionalAuth, async (req, res) => {
+  try {
+    const { invite_code, game_id, analysis_json } = req.body;
+    if (!analysis_json) {
+      return res.status(400).json({ error: 'analysis_json required' });
+    }
+
+    const jsonStr = typeof analysis_json === 'object' ? JSON.stringify(analysis_json) : analysis_json;
+
+    let targetCode = invite_code;
+    if (!targetCode && game_id) {
+      const g = await db.get('SELECT invite_code FROM games WHERE id = ?', [game_id]);
+      if (g) targetCode = g.invite_code;
+    }
+
+    if (!targetCode) {
+      return res.status(400).json({ error: 'Valid invite_code or game_id required to store analysis' });
+    }
+
+    await db.run('UPDATE games SET analysis_json = ? WHERE invite_code = ?', [jsonStr, targetCode]);
+    res.json({ success: true, saved: true, invite_code: targetCode });
+  } catch (err) {
+    console.error('[Analysis] Store error:', err);
+    res.status(500).json({ error: 'Failed to store analysis in database' });
+  }
+});
+
+// POST /api/analysis/game — Analyze a full game PGN and store inside database
+router.post('/game', optionalAuth, async (req, res) => {
+  try {
+    let { pgn, invite_code, game_id, force } = req.body;
+
+    let game = null;
+    if (invite_code) {
+      game = await db.get('SELECT * FROM games WHERE invite_code = ?', [invite_code]);
+    } else if (game_id) {
+      game = await db.get('SELECT * FROM games WHERE id = ?', [game_id]);
+    }
+
+    // 1. If game already has analysis stored in DB and force refresh was not requested, return DB review immediately
+    if (game && game.analysis_json && !force) {
+      try {
+        const cachedResult = typeof game.analysis_json === 'string'
+          ? JSON.parse(game.analysis_json)
+          : game.analysis_json;
+        return res.json({
+          ...cachedResult,
+          cached: true,
+          invite_code: game.invite_code,
+          game_id: game.id,
+          pgn: game.pgn || pgn
+        });
+      } catch (parseErr) {
+        console.warn('[Analysis] Cached analysis parse failed, re-evaluating...');
+      }
+    }
+
+    // 2. Determine PGN to analyze
+    if (!pgn && game && game.pgn) {
+      pgn = game.pgn;
+    }
+
+    if (!pgn) {
+      return res.status(400).json({ error: 'PGN required or match has no recorded notation' });
+    }
 
     let isStockfish = stockfish.isAvailable();
     const chess = new Chess();
@@ -58,7 +248,6 @@ router.post('/game', authMiddleware, async (req, res) => {
         evalChess.move(move.san);
 
         // Classify the move based on eval change
-        const evalDiff = Math.abs(currentEval - prevEval);
         const isWhiteMove = i % 2 === 0;
         const evalChange = isWhiteMove
           ? (currentEval - prevEval)
@@ -135,18 +324,40 @@ router.post('/game', authMiddleware, async (req, res) => {
       summary: {
         white: countClassifications(whiteMoves),
         black: countClassifications(blackMoves)
-      }
+      },
+      analyzed_at: new Date().toISOString()
     };
 
-    // Save analysis to game record if invite_code provided
-    if (invite_code) {
+    // 3. Persist review into database for later use with nodes
+    let savedInviteCode = game ? game.invite_code : invite_code;
+    const jsonToStore = JSON.stringify(result);
+
+    if (game) {
+      await db.run(
+        'UPDATE games SET analysis_json = ? WHERE id = ?',
+        [jsonToStore, game.id]
+      );
+    } else if (invite_code) {
       await db.run(
         'UPDATE games SET analysis_json = ? WHERE invite_code = ?',
-        [JSON.stringify(result), invite_code]
+        [jsonToStore, invite_code]
+      );
+    } else {
+      // Create new game record in DB so it is permanently stored for nodes
+      savedInviteCode = 'rev_' + uuidv4().replace(/-/g, '').substring(0, 8);
+      await db.insert(
+        'INSERT INTO games (invite_code, white_id, black_id, game_type, pgn, result, analysis_json) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [savedInviteCode, req.user?.id || null, null, 'analysis', pgn, '*', jsonToStore]
       );
     }
 
-    res.json(result);
+    res.json({
+      ...result,
+      cached: false,
+      invite_code: savedInviteCode,
+      game_id: game ? game.id : null,
+      saved_to_database: true
+    });
   } catch (err) {
     console.error('[Analysis] Error:', err);
     res.status(500).json({ error: 'Analysis failed' });

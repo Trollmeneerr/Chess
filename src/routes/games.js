@@ -124,15 +124,91 @@ router.post('/:inviteCode/save', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/games/history/me — Get current user's game history
+const { getBotByElo } = require('../engine/bots');
+
+// GET /api/games/history/me — Get current user's game history with full opponent and analysis metadata
 router.get('/history/me', authMiddleware, async (req, res) => {
   try {
     const games = await db.all(
-      'SELECT * FROM games WHERE (white_id = ? OR black_id = ?) AND result IS NOT NULL ORDER BY created_at DESC LIMIT 50',
+      `SELECT g.id, g.invite_code, g.white_id, g.black_id, g.game_type, g.time_control, 
+              g.bot_elo, g.pgn, g.result, g.analysis_json, g.created_at,
+              w.username AS white_username, w.avatar_id AS white_avatar, w.elo_rating AS white_elo,
+              b.username AS black_username, b.avatar_id AS black_avatar, b.elo_rating AS black_elo
+       FROM games g
+       LEFT JOIN users w ON g.white_id = w.id
+       LEFT JOIN users b ON g.black_id = b.id
+       WHERE (g.white_id = ? OR g.black_id = ?) AND g.result IS NOT NULL
+       ORDER BY g.created_at DESC LIMIT 50`,
       [req.user.id, req.user.id]
     );
-    res.json({ games });
+
+    const formatted = games.map(g => {
+      const isWhite = g.white_id === req.user.id;
+      let outcome = 'draw';
+      let opponentName = 'Unknown';
+      let opponentAvatar = 1;
+      let opponentElo = null;
+
+      if (g.game_type === 'bot') {
+        const bot = getBotByElo(g.bot_elo);
+        opponentName = bot?.name || 'AI Bot';
+        opponentAvatar = bot?.avatar || 1;
+        opponentElo = bot?.elo || g.bot_elo;
+      } else {
+        if (isWhite) {
+          opponentName = g.black_username || 'Opponent';
+          opponentAvatar = g.black_avatar || 1;
+          opponentElo = g.black_elo;
+        } else {
+          opponentName = g.white_username || 'Opponent';
+          opponentAvatar = g.white_avatar || 1;
+          opponentElo = g.white_elo;
+        }
+      }
+
+      if (g.result === '1-0') outcome = isWhite ? 'win' : 'loss';
+      else if (g.result === '0-1') outcome = isWhite ? 'loss' : 'win';
+      else outcome = 'draw';
+
+      let moveCount = 0;
+      if (g.pgn) {
+        const matches = g.pgn.match(/\d+\.\s/g);
+        if (matches) moveCount = matches.length;
+      }
+
+      let whiteAccuracy = null;
+      let blackAccuracy = null;
+      if (g.analysis_json) {
+        try {
+          const parsed = typeof g.analysis_json === 'string' ? JSON.parse(g.analysis_json) : g.analysis_json;
+          whiteAccuracy = parsed.whiteAccuracy;
+          blackAccuracy = parsed.blackAccuracy;
+        } catch (e) {}
+      }
+
+      return {
+        id: g.id,
+        invite_code: g.invite_code,
+        game_type: g.game_type,
+        time_control: g.time_control || 'rapid',
+        user_color: isWhite ? 'white' : 'black',
+        outcome,
+        result: g.result,
+        opponent_name: opponentName,
+        opponent_avatar: opponentAvatar,
+        opponent_elo: opponentElo,
+        move_count: moveCount,
+        has_analysis: Boolean(g.analysis_json),
+        white_accuracy: whiteAccuracy,
+        black_accuracy: blackAccuracy,
+        pgn: g.pgn,
+        created_at: g.created_at
+      };
+    });
+
+    res.json({ games: formatted });
   } catch (err) {
+    console.error('[Games] History error:', err);
     res.status(500).json({ error: 'Failed to get game history' });
   }
 });
