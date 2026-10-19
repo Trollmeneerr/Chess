@@ -156,6 +156,7 @@ async function initialize() {
       await db.execute(SCHEMA.user_puzzle_history_mysql);
       await db.execute(SCHEMA.bot_win_log_mysql);
       console.log('[DB] MySQL tables ready');
+      await runMigrations();
       await seedStarterPuzzles();
       return;
     } catch (err) {
@@ -181,7 +182,62 @@ async function initialize() {
   db.exec(SCHEMA.user_puzzle_history);
   db.exec(SCHEMA.bot_win_log);
   console.log('[DB] SQLite tables ready');
+  await runMigrations();
   await seedStarterPuzzles();
+}
+
+async function runMigrations() {
+  try {
+    if (isMySQL) {
+      // 1. Check games table for analysis_json column
+      try {
+        const [cols] = await db.execute("SHOW COLUMNS FROM games LIKE 'analysis_json'");
+        if (!cols || cols.length === 0) {
+          console.log('[DB] Running migration: Adding analysis_json column to MySQL games table...');
+          await db.execute('ALTER TABLE games ADD COLUMN analysis_json LONGTEXT NULL');
+        }
+      } catch (e) {
+        console.warn('[DB] Migration note (games.analysis_json):', e.message);
+      }
+
+      // 2. Check users table for avatar_id column
+      try {
+        const [cols] = await db.execute("SHOW COLUMNS FROM users LIKE 'avatar_id'");
+        if (!cols || cols.length === 0) {
+          console.log('[DB] Running migration: Adding avatar_id column to MySQL users table...');
+          await db.execute('ALTER TABLE users ADD COLUMN avatar_id INT DEFAULT 1');
+        }
+      } catch (e) {
+        console.warn('[DB] Migration note (users.avatar_id):', e.message);
+      }
+    } else {
+      // SQLite migrations
+      try {
+        const pragma = db.pragma('table_info(games)');
+        const hasAnalysis = pragma.some(col => col.name === 'analysis_json');
+        if (!hasAnalysis) {
+          console.log('[DB] Running migration: Adding analysis_json column to SQLite games table...');
+          db.exec('ALTER TABLE games ADD COLUMN analysis_json TEXT');
+        }
+      } catch (e) {
+        console.warn('[DB] SQLite migration note (games.analysis_json):', e.message);
+      }
+
+      try {
+        const pragma = db.pragma('table_info(users)');
+        const hasAvatar = pragma.some(col => col.name === 'avatar_id');
+        if (!hasAvatar) {
+          console.log('[DB] Running migration: Adding avatar_id column to SQLite users table...');
+          db.exec('ALTER TABLE users ADD COLUMN avatar_id INTEGER DEFAULT 1');
+        }
+      } catch (e) {
+        console.warn('[DB] SQLite migration note (users.avatar_id):', e.message);
+      }
+    }
+    console.log('[DB] Schema and migration checks complete');
+  } catch (err) {
+    console.warn('[DB] Schema migration check warning:', err.message);
+  }
 }
 
 async function seedStarterPuzzles() {

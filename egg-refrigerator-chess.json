@@ -13,7 +13,7 @@
     "ghcr.io/pelican-eggs/yolks:nodejs_20": "ghcr.io/pelican-eggs/yolks:nodejs_20"
   },
   "file_denylist": [],
-  "startup": "if [ ! -f \"src/server.js\" ]; then echo \"[Startup] Files missing, cloning repository...\" && git clone https://github.com/Trollmeneerr/Chess.git /tmp/chess && (cp -rn /tmp/chess/* /tmp/chess/.* . 2>/dev/null || cp -r /tmp/chess/* .) && rm -rf /tmp/chess && npm install --production; fi; chmod +x engine/stockfish 2>/dev/null || true; node src/server.js --port {{SERVER_PORT}} --domain {{SUBDOMAIN}}",
+  "startup": "if [ -d \".git\" ]; then echo \"[Startup] Checking for git updates...\" && git fetch origin main 2>/dev/null && (git pull origin main 2>/dev/null || true); elif [ ! -f \"src/server.js\" ]; then echo \"[Startup] Files missing, cloning repository...\" && git clone https://github.com/Trollmeneerr/Chess.git /tmp/chess && (cp -rn /tmp/chess/* /tmp/chess/.* . 2>/dev/null || cp -r /tmp/chess/* .) && rm -rf /tmp/chess && npm install --production; fi; chmod +x engine/stockfish 2>/dev/null || true; node src/server.js --port {{SERVER_PORT}} --domain {{SUBDOMAIN}}",
   "config": {
     "files": "{}",
     "startup": "{\r\n    \"done\": \"[Server] Refrigerator Chess running on port\"\r\n}",
@@ -147,6 +147,16 @@
       "user_viewable": true,
       "user_editable": true,
       "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Auto Update on Startup",
+      "description": "Automatically check for git repository updates and database migrations every time the server starts.",
+      "env_variable": "AUTO_UPDATE",
+      "default_value": "true",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|in:true,false",
       "field_type": "text"
     }
   ]

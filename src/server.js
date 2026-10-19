@@ -20,18 +20,9 @@ for (let i = 0; i < args.length; i++) {
   if (args[i] === '--domain' && args[i + 1]) domain = args[i + 1];
 }
 
-// Init DB (MySQL or SQLite fallback)
+const updater = require('./updater');
 const db = require('./db');
-db.initialize().then(() => {
-  console.log('[DB] Database initialized successfully');
-}).catch(err => {
-  console.error('[DB] Failed to initialize database:', err);
-  process.exit(1);
-});
-
-// Init Stockfish engine pool
 const stockfish = require('./engine/stockfish');
-stockfish.initialize();
 
 // Express app
 const app = express();
@@ -118,9 +109,39 @@ const botSocket = require('./sockets/bot');
 pvpSocket.register(io);
 botSocket.register(io);
 
-// Start
-server.listen(port, '0.0.0.0', () => {
-  console.log(`[Server] Refrigerator Chess running on port ${port}`);
-  console.log(`[Server] Domain: ${domain}`);
-  console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+// Start server sequence with update check
+async function startServer() {
+  console.log('[Server] Starting Refrigerator Chess initialization...');
+
+  // 1. Check for repository and code updates
+  try {
+    const updated = await updater.checkAndApplyUpdates();
+    if (updated) {
+      // If code was updated, the process has restarted or will exit
+      return;
+    }
+  } catch (err) {
+    console.warn('[Updater] Pre-flight update check note:', err.message);
+  }
+
+  // 2. Initialize database and run schema migrations
+  try {
+    await db.initialize();
+    console.log('[DB] Database initialized successfully');
+  } catch (err) {
+    console.error('[DB] Failed to initialize database:', err);
+    process.exit(1);
+  }
+
+  // 3. Initialize Stockfish engine pool
+  stockfish.initialize();
+
+  // 4. Start HTTP & Socket.IO server
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`[Server] Refrigerator Chess running on port ${port}`);
+    console.log(`[Server] Domain: ${domain}`);
+    console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+}
+
+startServer();
