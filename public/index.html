@@ -3,28 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Play chess online with friends or challenge AI bots. Puzzles, analysis, and more on Refrigerator Chess.">
+  <meta name="description" content="Play chess online with friends or challenge AI bots. Puzzles, analysis, and more on Refrigerator Chess — isyourrefrigerator.online">
   <title>Refrigerator Chess — isyourrefrigerator.online</title>
+  <link rel="icon" type="image/png" href="/images/logo.png">
+
+  <!-- Typography: Space Grotesk, Inter, JetBrains Mono from isyourrefrigerator.online -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/board.css">
   <link rel="stylesheet" href="/css/components.css">
 </head>
 <body>
+  <!-- Ambient Scene & Aurora Background from isyourrefrigerator.online -->
+  <div class="scene">
+    <div class="aurora a1"></div>
+    <div class="aurora a2"></div>
+    <div class="aurora a3"></div>
+    <div class="frost-grid"></div>
+    <div class="grain"></div>
+  </div>
+
   <div id="app">
     <!-- Sidebar Navigation -->
     <nav id="sidebar" class="sidebar">
       <div class="sidebar-logo">
-        <div class="logo-icon">
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-            <rect width="32" height="32" rx="8" fill="url(#logoGrad)"/>
-            <path d="M16 6L20 10H18V14H20L24 18V22H8V18L12 14H14V10H12L16 6Z" fill="white" opacity="0.9"/>
-            <defs><linearGradient id="logoGrad" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#38bdf8"/><stop offset="1" stop-color="#0284c7"/></linearGradient></defs>
-          </svg>
+        <a href="https://isyourrefrigerator.online" class="brand-link" target="_blank" rel="noopener noreferrer" title="Visit isyourrefrigerator.online">
+          <img src="/images/logo.png" alt="Logo" class="logo-icon">
+          <img src="/images/wordmark.png" alt="IsYourRefrigerator.online" class="logo-wordmark">
+        </a>
+        <div class="brand-subtag">
+          <span class="badge"><span class="pulse-dot"></span> CHESS // ONLINE</span>
         </div>
-        <span class="logo-text">Refrigerator<br><strong>Chess</strong></span>
       </div>
 
       <div class="sidebar-nav">
@@ -50,6 +62,18 @@
         </button>
       </div>
 
+      <!-- Quick External Links to Website and Panel -->
+      <div class="sidebar-external-links">
+        <a href="https://isyourrefrigerator.online" class="btn btn-outline btn-sm btn-block" target="_blank" rel="noopener noreferrer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          <span>Main Site</span>
+        </a>
+        <a href="https://panel.isyourrefrigerator.online" class="btn btn-fill btn-sm btn-block mt-1" target="_blank" rel="noopener noreferrer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="6" rx="1"></rect><rect x="2" y="15" width="20" height="6" rx="1"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+          <span>Server Panel</span>
+        </a>
+      </div>
+
       <div class="sidebar-bottom">
         <div id="user-panel" class="user-panel hidden">
           <div class="user-avatar" id="sidebar-avatar"></div>
@@ -62,8 +86,8 @@
           </button>
         </div>
         <div id="auth-panel" class="auth-panel">
-          <button class="btn btn-primary btn-sm" id="btn-show-login">Sign In</button>
-          <button class="btn btn-ghost btn-sm" id="btn-show-register">Register</button>
+          <button class="btn btn-fill btn-sm" id="btn-show-login">Sign In</button>
+          <button class="btn btn-outline btn-sm" id="btn-show-register">Register</button>
         </div>
       </div>
     </nav>
@@ -72,6 +96,14 @@
     <main id="main-content" class="main-content">
       <!-- Pages are dynamically rendered here -->
     </main>
+  </div>
+
+  <!-- Bot Match Setup Modal (Popup for Challenging Bots) -->
+  <div id="bot-match-modal" class="modal-overlay hidden">
+    <div class="modal glass-panel bot-modal" style="max-width: 480px;">
+      <button class="modal-close" id="bot-modal-close">&times;</button>
+      <div id="bot-modal-content"></div>
+    </div>
   </div>
 
   <!-- Auth Modal -->
@@ -87,10 +119,10 @@
     <div class="modal promotion-modal glass-panel">
       <h3>Promote Pawn</h3>
       <div class="promotion-pieces">
-        <button class="promotion-piece" data-piece="q">♛</button>
-        <button class="promotion-piece" data-piece="r">♜</button>
-        <button class="promotion-piece" data-piece="b">♝</button>
-        <button class="promotion-piece" data-piece="n">♞</button>
+        <button class="promotion-piece" data-piece="q"></button>
+        <button class="promotion-piece" data-piece="r"></button>
+        <button class="promotion-piece" data-piece="b"></button>
+        <button class="promotion-piece" data-piece="n"></button>
       </div>
     </div>
   </div>
@@ -102,13 +134,14 @@
       <div class="modal-icon">🔒</div>
       <h2>Password Reset</h2>
       <p class="modal-text">Password resets are handled manually by the administrator. Please send a direct message to the admin on <strong>Discord</strong> with your username to receive a temporary reset token.</p>
-      <button class="btn btn-primary" onclick="document.getElementById('forgot-modal').classList.add('hidden')">Understood</button>
+      <button class="btn btn-fill" onclick="document.getElementById('forgot-modal').classList.add('hidden')">Understood</button>
     </div>
   </div>
 
   <!-- Scripts -->
   <script src="/js/lib/chess.min.js"></script>
   <script src="/js/lib/socket.io.min.js"></script>
+  <script src="/js/pieces.js"></script>
   <script src="/js/config.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/auth.js"></script>

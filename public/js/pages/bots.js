@@ -8,20 +8,18 @@ const BotsPage = {
   currentEval: 0,
 
   render(selectedBotElo = null) {
-    const main = document.getElementById('main-content');
-    if (selectedBotElo) {
-      this.startBotMatch(selectedBotElo);
-    } else {
-      this.renderRoster();
-    }
+    this.renderRoster().then(() => {
+      if (selectedBotElo) {
+        const elo = parseInt(selectedBotElo);
+        const roster = this.getRoster();
+        const bot = roster.find(b => b.elo === elo) || { name: 'Bot', elo, avatar: '🤖', desc: 'Calibrated AI opponent' };
+        this.openBotModal(bot);
+      }
+    });
   },
 
-  async renderRoster() {
-    const main = document.getElementById('main-content');
-    const isLoggedIn = !!Auth.currentUser;
-    const user = Auth.currentUser;
-
-    const roster = [
+  getRoster() {
+    return [
       { name: 'Frosty',        elo: 250,  avatar: '⛄', desc: 'Just learned the rules. Drops pieces constantly.' },
       { name: 'Chilly',        elo: 500,  avatar: '❄️', desc: 'Knows how pieces move, but misses basic tactics.' },
       { name: 'Cooler',        elo: 800,  avatar: '🧊', desc: 'Can spot simple threats and hanging captures.' },
@@ -32,6 +30,12 @@ const BotsPage = {
       { name: 'Arctic Storm',  elo: 1800, avatar: '⚡', desc: 'Expert-level play. Calculates deep tactical lines.' },
       { name: 'Absolute Zero', elo: 2000, avatar: '👑', desc: 'The Final Boss. Master strength running Stockfish AVX2.' }
     ];
+  },
+
+  async renderRoster() {
+    const main = document.getElementById('main-content');
+    const isLoggedIn = !!Auth.currentUser;
+    const roster = this.getRoster();
 
     let cardsHTML = '';
     roster.forEach(b => {
@@ -43,7 +47,7 @@ const BotsPage = {
           <div class="bot-name">${b.name}</div>
           <div class="bot-elo">${b.elo} ELO</div>
           <div class="bot-desc">${b.desc}</div>
-          <button class="btn btn-primary btn-sm btn-block mt-2">Challenge</button>
+          <button class="btn btn-fill btn-sm btn-block mt-2">Challenge</button>
         </div>
       `;
     });
@@ -70,22 +74,104 @@ const BotsPage = {
     main.querySelectorAll('.bot-card').forEach(card => {
       card.addEventListener('click', () => {
         const elo = parseInt(card.dataset.elo);
-        this.promptColorAndStart(elo);
+        const bot = roster.find(b => b.elo === elo) || { name: 'Bot', elo, avatar: '🤖', desc: 'Calibrated AI' };
+        this.openBotModal(bot);
       });
     });
   },
 
-  promptColorAndStart(elo) {
-    if (!Auth.currentUser) {
-      Auth.showLoginModal();
+  openBotModal(bot) {
+    const modal = document.getElementById('bot-match-modal');
+    const content = document.getElementById('bot-modal-content');
+    if (!modal || !content) {
+      this.startBotMatch(bot.elo, 'white');
       return;
     }
 
-    const choice = prompt(`Choose your color against the bot:\nType 'white', 'black', or 'random'`, 'white');
-    if (choice === null) return;
-    const pref = ['white', 'black', 'random'].includes(choice.toLowerCase().trim()) ? choice.toLowerCase().trim() : 'white';
+    const isLoggedIn = !!Auth.currentUser;
+    const tier = bot.elo <= 500 ? 'Beginner' : (bot.elo <= 1200 ? 'Intermediate' : (bot.elo <= 1500 ? 'Advanced' : (bot.elo < 2000 ? 'Expert' : 'Final Boss')));
+    const tierColor = bot.elo <= 500 ? 'var(--cyan)' : (bot.elo <= 1200 ? 'var(--green)' : (bot.elo <= 1500 ? 'var(--amber)' : 'var(--red)'));
 
-    this.startBotMatch(elo, pref);
+    let selectedColor = 'white';
+
+    content.innerHTML = `
+      <div class="bot-modal-header text-center">
+        <div class="bot-modal-avatar-wrap">
+          <div class="bot-modal-avatar">${bot.avatar}</div>
+        </div>
+        <h2 class="bot-modal-title mt-2">${bot.name}</h2>
+        <div class="bot-badge-row mt-1">
+          <span class="badge" style="border-color:${tierColor};color:${tierColor}">${tier}</span>
+          <span class="badge badge-accent">${bot.elo} ELO</span>
+        </div>
+        <p class="bot-modal-desc mt-2">${bot.desc}</p>
+      </div>
+
+      <div class="bot-modal-section mt-3">
+        <label class="form-label text-center d-block">Choose Your Side</label>
+        <div class="bot-side-selector">
+          <button type="button" class="side-btn active" data-color="white" id="side-white">
+            <span class="side-piece">${AppConfig.getPieceSVG('K')}</span>
+            <span class="side-name">White</span>
+            <span class="side-sub">First Move</span>
+          </button>
+          <button type="button" class="side-btn" data-color="random" id="side-random">
+            <span class="side-piece-icon">☯</span>
+            <span class="side-name">Random</span>
+            <span class="side-sub">Balanced</span>
+          </button>
+          <button type="button" class="side-btn" data-color="black" id="side-black">
+            <span class="side-piece">${AppConfig.getPieceSVG('k')}</span>
+            <span class="side-name">Black</span>
+            <span class="side-sub">Defend</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="bot-modal-footer mt-3">
+        ${!isLoggedIn ? `
+          <div class="guest-warning text-center mb-2">
+            <small style="color:var(--text-dim);">Playing as Guest. <a href="#" id="modal-link-signin" style="color:var(--cyan);text-decoration:underline;">Sign In</a> to save rating & unlock badges.</small>
+          </div>
+        ` : ''}
+        <button type="button" class="btn btn-fill btn-lg btn-block" id="btn-start-bot-game">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <span>Start Match</span>
+        </button>
+      </div>
+    `;
+
+    modal.classList.remove('hidden');
+
+    // Color buttons
+    content.querySelectorAll('.side-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        content.querySelectorAll('.side-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedColor = btn.dataset.color;
+      });
+    });
+
+    // Start button
+    document.getElementById('btn-start-bot-game')?.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      this.startBotMatch(bot.elo, selectedColor);
+    });
+
+    // Close button
+    document.getElementById('bot-modal-close')?.addEventListener('click', () => {
+      modal.classList.add('hidden');
+    });
+
+    modal.onclick = (e) => {
+      if (e.target === modal) modal.classList.add('hidden');
+    };
+
+    document.getElementById('modal-link-signin')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      modal.classList.add('hidden');
+      Auth.showLoginModal();
+    });
   },
 
   startBotMatch(elo, colorPreference = 'white') {

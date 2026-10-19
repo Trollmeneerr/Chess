@@ -202,3 +202,6 @@ const Auth = {
     return true;
   }
 };
+
+window.Auth = Auth;
+

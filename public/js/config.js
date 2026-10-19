@@ -16,5 +16,13 @@ const AppConfig = {
   PIECE_VALUES: { 'p': 1, 'n': 3, 'b': 3, 'r': 5, 'q': 9, 'k': 0 },
   FILES: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'],
   RANKS: ['8', '7', '6', '5', '4', '3', '2', '1'],
-  INITIAL_FEN: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+  INITIAL_FEN: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+  getPieceSVG(piece) {
+    if (!piece) return '';
+    if (window.PIECE_SVGS && window.PIECE_SVGS[piece]) {
+      return window.PIECE_SVGS[piece];
+    }
+    return this.PIECE_UNICODE[piece] || piece;
+  }
 };
+

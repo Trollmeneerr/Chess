@@ -1,14 +1,15 @@
-/* ====================================================================
-   Chess Board Styles — Interactive SVG/CSS board with animations
-   ==================================================================== */
+/* =========================================================================
+   Chess Board Styles — Subzero Theme, SVG Vectors, Sizing & Arrow Layer
+   ========================================================================= */
 
 .board-layout {
   display: flex;
-  gap: 20px;
-  max-width: 1200px;
+  gap: 24px;
+  max-width: 1400px;
   width: 100%;
   align-items: flex-start;
-  animation: fadeIn 400ms ease;
+  justify-content: center;
+  animation: fadeIn 350ms ease;
 }
 
 /* --- Eval Bar --- */
@@ -18,18 +19,20 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  align-self: stretch;
 }
 
 .eval-bar {
   width: 24px;
-  height: 100%;
+  flex: 1;
   min-height: 400px;
   border-radius: 12px;
   overflow: hidden;
   position: relative;
-  background: #1a1a2e;
+  background: #07152b;
   border: 1px solid var(--glass-border);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6);
 }
 
 .eval-bar-fill {
@@ -37,23 +40,27 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(to top, #f1f5f9, #e2e8f0);
-  transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(to top, #ffffff, #e0f2fe);
+  box-shadow: 0 -2px 10px rgba(56, 189, 248, 0.4);
+  transition: height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   height: 50%;
 }
 
 .eval-bar-label {
-  font-size: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 700;
-  color: var(--text-secondary);
+  color: var(--cyan);
   text-align: center;
   min-height: 16px;
 }
 
-/* --- Chess Board --- */
+/* --- Chess Board Wrapper & Grid --- */
 .board-wrapper {
   position: relative;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .chess-board {
@@ -62,16 +69,43 @@
   grid-template-rows: repeat(8, 1fr);
   border-radius: var(--radius-md);
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 2px rgba(56, 189, 248, 0.15);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.65), 0 0 0 2px rgba(56, 189, 248, 0.25), 0 0 35px rgba(13, 140, 241, 0.15);
   user-select: none;
   -webkit-user-select: none;
   position: relative;
+  aspect-ratio: 1 / 1;
 }
 
-.chess-board.size-sm { width: 320px; height: 320px; }
-.chess-board.size-md { width: 440px; height: 440px; }
-.chess-board.size-lg { width: 560px; height: 560px; }
+/* Board Sizing: Enlarged for desktop */
+.chess-board.size-sm { width: 340px; height: 340px; }
+.chess-board.size-md { width: 480px; height: 480px; }
+.chess-board.size-lg {
+  width: min(720px, calc(100vw - 420px), 80vh);
+  height: min(720px, calc(100vw - 420px), 80vh);
+}
 
+@media (min-width: 1440px) {
+  .chess-board.size-lg {
+    width: min(760px, calc(100vw - 460px), 82vh);
+    height: min(760px, calc(100vw - 460px), 82vh);
+  }
+}
+
+@media (max-width: 1024px) {
+  .chess-board.size-lg {
+    width: min(580px, calc(100vw - 320px), 72vh);
+    height: min(580px, calc(100vw - 320px), 72vh);
+  }
+}
+
+@media (max-width: 768px) {
+  .chess-board.size-lg {
+    width: min(440px, calc(100vw - 32px), 62vh);
+    height: min(440px, calc(100vw - 32px), 62vh);
+  }
+}
+
+/* Subzero Frost Palette for Squares */
 .square {
   position: relative;
   display: flex;
@@ -82,39 +116,31 @@
 }
 
 .square-light {
-  background: #b7c0d8;
+  background: #c8d6e5;
 }
 
 .square-dark {
-  background: #6b7db3;
+  background: #254a7c;
 }
 
 /* Last move highlight */
-.square.last-move-from,
-.square.last-move-to {
-  position: relative;
-}
-
 .square.last-move-from::before,
 .square.last-move-to::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 0, 0.25);
+  background: rgba(250, 204, 21, 0.32);
   pointer-events: none;
   z-index: 1;
 }
 
 /* Selected square */
-.square.selected {
-  position: relative;
-}
-
 .square.selected::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.45);
+  box-shadow: inset 0 0 12px rgba(56, 189, 248, 0.6);
   pointer-events: none;
   z-index: 1;
 }
@@ -123,10 +149,11 @@
 .square.legal-move::after {
   content: '';
   position: absolute;
-  width: 28%;
-  height: 28%;
+  width: 26%;
+  height: 26%;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(3, 11, 24, 0.28);
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.2);
   pointer-events: none;
   z-index: 2;
 }
@@ -135,88 +162,121 @@
 .square.legal-capture::after {
   content: '';
   position: absolute;
-  width: 85%;
-  height: 85%;
+  width: 84%;
+  height: 84%;
   border-radius: 50%;
-  border: 3px solid rgba(0, 0, 0, 0.18);
+  border: 4px solid rgba(3, 11, 24, 0.3);
   background: transparent;
   pointer-events: none;
   z-index: 2;
 }
 
 /* Check glow */
-.square.in-check {
-  animation: checkGlow 1.5s ease-in-out infinite;
-}
-
 .square.in-check::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle, rgba(248, 113, 113, 0.6) 0%, rgba(248, 113, 113, 0) 70%);
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.75) 0%, rgba(239, 68, 68, 0) 75%);
   pointer-events: none;
   z-index: 1;
+  animation: checkPulse 1.2s infinite ease-in-out;
 }
 
-/* Premove highlight */
-.square.premove {
-  position: relative;
+@keyframes checkPulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.8)); }
 }
 
-.square.premove::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(56, 189, 248, 0.2);
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* Right-click arrow highlight */
+/* Right-click square highlights (Chess.com / Lichess style) */
 .square.highlight-green::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(52, 211, 153, 0.4);
+  background: rgba(34, 197, 94, 0.42);
+  box-shadow: inset 0 0 14px rgba(34, 197, 94, 0.65);
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
+}
+
+.square.highlight-cyan::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(56, 189, 248, 0.42);
+  box-shadow: inset 0 0 14px rgba(56, 189, 248, 0.65);
+  pointer-events: none;
+  z-index: 2;
 }
 
 .square.highlight-red::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(248, 113, 113, 0.4);
+  background: rgba(239, 68, 68, 0.42);
+  box-shadow: inset 0 0 14px rgba(239, 68, 68, 0.65);
   pointer-events: none;
-  z-index: 1;
-}
-
-.square.highlight-blue::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(56, 189, 248, 0.4);
-  pointer-events: none;
-  z-index: 1;
+  z-index: 2;
 }
 
 .square.highlight-yellow::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(251, 191, 36, 0.4);
+  background: rgba(245, 158, 11, 0.42);
+  box-shadow: inset 0 0 14px rgba(245, 158, 11, 0.65);
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
 }
 
-/* --- Chess Pieces --- */
+/* --- SVG Arrow Overlay Layer --- */
+.board-arrows-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* --- Chess Piece Vectors --- */
+/* Pieces fill approximately 90% of square dimensions */
 .piece {
-  width: 85%;
-  height: 85%;
+  width: 90%;
+  height: 90%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   z-index: 3;
   pointer-events: none;
-  filter: drop-shadow(1px 2px 3px rgba(0, 0, 0, 0.3));
+  user-select: none;
+  -webkit-user-select: none;
   transition: transform var(--transition-fast);
+}
+
+.piece svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* White pieces: clean ivory/white with drop-shadow */
+.piece[data-piece="P"] svg,
+.piece[data-piece="N"] svg,
+.piece[data-piece="B"] svg,
+.piece[data-piece="R"] svg,
+.piece[data-piece="Q"] svg,
+.piece[data-piece="K"] svg {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
+}
+
+/* Black pieces: solid black fill with crisp outline halo so they pop on dark blue squares */
+.piece[data-piece="p"] svg,
+.piece[data-piece="n"] svg,
+.piece[data-piece="b"] svg,
+.piece[data-piece="r"] svg,
+.piece[data-piece="q"] svg,
+.piece[data-piece="k"] svg {
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.65)) drop-shadow(0 3px 6px rgba(0, 0, 0, 0.85));
 }
 
 .square:hover .piece {
@@ -225,18 +285,23 @@
 
 .piece.dragging {
   position: fixed;
-  width: 60px;
-  height: 60px;
-  z-index: 100;
+  width: 72px;
+  height: 72px;
+  z-index: 1000;
   pointer-events: none;
-  transform: scale(1.2);
-  filter: drop-shadow(2px 4px 8px rgba(0, 0, 0, 0.5));
+  transform: scale(1.15);
+  filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.75));
+}
+
+.piece.dragging svg {
+  width: 100%;
+  height: 100%;
 }
 
 /* --- Board Coordinates --- */
 .board-coords-rank {
   position: absolute;
-  left: -18px;
+  left: -20px;
   top: 0;
   height: 100%;
   display: flex;
@@ -247,7 +312,7 @@
 
 .board-coords-file {
   position: absolute;
-  bottom: -20px;
+  bottom: -22px;
   left: 0;
   width: 100%;
   display: flex;
@@ -256,109 +321,177 @@
 }
 
 .coord-label {
+  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  width: 14px;
-  text-align: center;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
 }
 
-/* --- Player Info Bar --- */
+/* --- Player Bars --- */
 .player-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
   padding: 8px 12px;
-  border-radius: var(--radius-md);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  margin: 6px 0;
+  background: rgba(10, 25, 48, 0.65);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-sm);
 }
 
-.player-bar-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+.player-info-badge {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  flex-shrink: 0;
+  gap: 10px;
 }
 
-.player-bar-info {
-  flex: 1;
+.player-avatar {
+  font-size: 22px;
+  line-height: 1;
 }
 
-.player-bar-name {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text-primary);
-}
-
-.player-bar-rating {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.player-bar-captured {
-  font-size: 14px;
-  letter-spacing: -1px;
-  color: var(--text-muted);
-  min-width: 80px;
-}
-
-.player-bar-material {
-  font-size: 12px;
+.player-name {
+  font-size: 0.92rem;
   font-weight: 700;
-  color: var(--text-secondary);
-  margin-left: 4px;
+  color: #ffffff;
 }
 
-/* --- Clock --- */
-.clock {
-  padding: 6px 14px;
-  border-radius: var(--radius-sm);
-  font-family: 'Inter', monospace;
-  font-size: 18px;
+.player-rating {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--cyan);
+}
+
+.player-clock {
+  font-family: var(--font-mono);
+  font-size: 1.3rem;
   font-weight: 700;
-  letter-spacing: 1px;
-  min-width: 80px;
-  text-align: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--glass-border);
+  color: #ffffff;
+  letter-spacing: 0.05em;
 }
 
-.clock-active {
-  background: var(--accent);
-  color: white;
-  animation: glow 2s ease-in-out infinite;
+.player-clock.active {
+  background: rgba(13, 140, 241, 0.25);
+  border-color: var(--cyan);
+  color: var(--cyan);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
 }
 
-.clock-inactive {
-  background: rgba(0, 0, 0, 0.3);
-  color: var(--text-muted);
+.player-clock.low-time {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: var(--red);
+  color: #fca5a5;
+  animation: clockAlert 1s infinite alternate;
 }
 
-.clock-low {
-  background: var(--danger);
-  color: white;
-  animation: pulse 1s ease-in-out infinite;
+@keyframes clockAlert {
+  from { box-shadow: 0 0 6px rgba(239, 68, 68, 0.3); }
+  to { box-shadow: 0 0 18px rgba(239, 68, 68, 0.8); }
 }
 
-/* --- Analysis badges --- */
-.move-badge {
-  display: inline-flex;
+.captured-pieces {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  font-size: 10px;
-  font-weight: 800;
+  gap: 2px;
 }
 
-.move-badge-best { background: var(--move-best); color: #1a1a2e; }
-.move-badge-good { background: var(--move-good); color: #1a1a2e; }
-.move-badge-inaccuracy { background: var(--move-inaccuracy); color: #1a1a2e; }
-.move-badge-mistake { background: var(--move-mistake); color: #1a1a2e; }
-.move-badge-blunder { background: var(--move-blunder); color: white; }
+.captured-piece {
+  width: 18px;
+  height: 18px;
+  opacity: 0.85;
+}
+
+.captured-piece svg {
+  width: 100%;
+  height: 100%;
+}
+
+.material-diff {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--cyan);
+  margin-left: 6px;
+}
+
+/* --- Right Dock Panel (Move list, Eval, Controls) --- */
+.dock-panel {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.move-list-container {
+  height: 380px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.move-list-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hair);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.move-list-header h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.move-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.move-row {
+  display: grid;
+  grid-template-columns: 36px 1fr 1fr;
+  padding: 4px 6px;
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.move-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.move-number {
+  color: var(--text-faint);
+}
+
+.move-san {
+  color: var(--text-dim);
+}
+
+.move-san:hover {
+  color: var(--cyan);
+}
+
+.move-san.active {
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.game-controls {
+  padding: 12px;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}

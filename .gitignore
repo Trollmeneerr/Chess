@@ -3,5 +3,5 @@ data/
 *.log
 .DS_Store
 Thumbs.db
-engine/stockfish
-engine/stockfish.exe
+engine/*.tar
+engine/*.zip

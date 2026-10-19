@@ -16,26 +16,66 @@ let requestQueue = [];
 let currentRequest = null;
 let outputBuffer = '';
 
+function isValidExecutable(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) return false;
+    const stats = fs.statSync(filePath);
+    if (stats.isDirectory() || stats.size < 100000) return false;
+
+    // Check ELF header on Linux (0x7F 'E' 'L' 'F') or MZ header on Windows (0x4D 0x5A)
+    const fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.alloc(4);
+    fs.readSync(fd, buf, 0, 4, 0);
+    fs.closeSync(fd);
+
+    if (process.platform === 'win32') {
+      return buf[0] === 0x4D && buf[1] === 0x5A;
+    } else {
+      return buf[0] === 0x7F && buf[1] === 0x45 && buf[2] === 0x4C && buf[3] === 0x46;
+    }
+  } catch (e) {
+    return false;
+  }
+}
+
 function getStockfishPath() {
   const localBin = path.join(__dirname, '..', '..', 'engine', 'stockfish');
   const localExe = path.join(__dirname, '..', '..', 'engine', 'stockfish.exe');
 
-  if (fs.existsSync(localBin)) return localBin;
-  if (fs.existsSync(localExe)) return localExe;
+  if (isValidExecutable(localBin)) {
+    try { fs.chmodSync(localBin, 0o755); } catch (e) {}
+    return localBin;
+  }
+  if (isValidExecutable(localExe)) return localExe;
 
-  // On Linux, attempt auto-download if missing
+  // System candidates (Debian/Ubuntu installs to /usr/games/stockfish)
+  const candidates = [
+    '/usr/games/stockfish',
+    '/usr/local/bin/stockfish',
+    '/usr/bin/stockfish'
+  ];
+  for (const p of candidates) {
+    if (isValidExecutable(p)) return p;
+  }
+
+  // On Linux, attempt auto-download / auto-install
   if (process.platform === 'linux') {
     try {
       const { execSync } = require('child_process');
       const engineDir = path.join(__dirname, '..', '..', 'engine');
       if (!fs.existsSync(engineDir)) fs.mkdirSync(engineDir, { recursive: true });
 
-      console.log('[Stockfish] Binary missing. Downloading official Stockfish 16.1 AVX2 Linux binary...');
-      const url = 'https://github.com/official-stockfish/Stockfish/releases/download/sf_16.1/stockfish-ubuntu-x86-64-avx2.tar';
-      execSync(`curl -sL --connect-timeout 15 "${url}" -o /tmp/sf.tar && tar -xf /tmp/sf.tar -C /tmp && cp $(find /tmp -type f -name "*stockfish*" | head -n 1) "${localBin}" && chmod +x "${localBin}" && rm -rf /tmp/sf*`, { stdio: 'inherit' });
+      try {
+        const whichOut = execSync('which stockfish 2>/dev/null || true').toString().trim();
+        if (whichOut && isValidExecutable(whichOut)) return whichOut;
+      } catch (e) {}
 
-      if (fs.existsSync(localBin)) {
-        console.log('[Stockfish] Successfully downloaded and installed Stockfish 16.1 AVX2!');
+      console.log('[Stockfish] Binary missing or invalid. Downloading official Stockfish binary...');
+      const url = 'https://github.com/official-stockfish/Stockfish/releases/download/sf_16.1/stockfish-ubuntu-x86-64-sse41-popcnt.tar';
+      execSync(`mkdir -p /tmp/sf_extract && curl -sL --connect-timeout 15 "${url}" -o /tmp/sf_pkg.tar && tar -xf /tmp/sf_pkg.tar -C /tmp/sf_extract && mv $(find /tmp/sf_extract -type f ! -name "*.tar" ! -name "*.gz" | head -n 1) "${localBin}" && chmod +x "${localBin}" && rm -rf /tmp/sf_*`, { stdio: 'inherit' });
+
+      if (isValidExecutable(localBin)) {
+        console.log('[Stockfish] Successfully downloaded and verified Stockfish binary!');
         return localBin;
       }
     } catch (err) {
@@ -43,14 +83,6 @@ function getStockfishPath() {
     }
   }
 
-  // System candidates
-  const candidates = [
-    '/usr/local/bin/stockfish',
-    '/usr/bin/stockfish'
-  ];
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return p;
-  }
   return null;
 }
 

@@ -108,7 +108,10 @@ const App = {
   }
 };
 
+window.App = App;
+
 // Start application when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   App.init();
 });
+

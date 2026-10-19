@@ -1,6 +1,7 @@
 /**
  * Chess Board Renderer
- * Interactive board with drag-and-drop, click-to-move, highlights, and animations
+ * Interactive board with drag-and-drop, click-to-move, highlights, SVG vector pieces,
+ * and interactive arrow / highlight drawing (Chess.com / Lichess style)
  */
 const ChessBoard = {
   containerId: null,
@@ -13,7 +14,10 @@ const ChessBoard = {
   lastMove: null,
   inCheck: false,
   checkSquare: null,
-  highlightedSquares: new Map(),
+  highlightedSquares: new Map(), // square -> 'green' | 'red' | 'blue' | 'yellow'
+  arrows: [], // array of { from, to }
+  rightDrag: null, // { from, startX, startY }
+  boundDocEvents: false,
   onMove: null, // callback(move) => { from, to, promotion }
   dragging: null,
   dragPieceEl: null,
@@ -27,6 +31,8 @@ const ChessBoard = {
     this.interactive = options.interactive !== false;
     this.onMove = options.onMove || null;
     this.fen = options.fen || AppConfig.INITIAL_FEN;
+    this.arrows = [];
+    this.highlightedSquares.clear();
     this.render();
     this.bindEvents();
   },
@@ -73,18 +79,35 @@ const ChessBoard = {
         // Check
         if (this.checkSquare === sq) classes += ' in-check';
 
-        // Custom highlights
+        // Custom right-click square highlights
         if (this.highlightedSquares.has(sq)) {
           classes += ` highlight-${this.highlightedSquares.get(sq)}`;
         }
 
         html += `<div class="${classes}" data-square="${sq}" data-rank="${rank}" data-file="${file}">`;
         if (piece) {
-          html += `<span class="piece" data-piece="${piece}">${AppConfig.PIECE_UNICODE[piece]}</span>`;
+          html += `<span class="piece" data-piece="${piece}">${AppConfig.getPieceSVG(piece)}</span>`;
         }
         html += '</div>';
       }
     }
+
+    // Arrows SVG overlay
+    html += `
+      <svg class="board-arrows-layer" id="board-arrows-svg" viewBox="0 0 8 8" preserveAspectRatio="none">
+        <defs>
+          <marker id="arrowhead-green" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="rgba(34, 197, 94, 0.9)" />
+          </marker>
+          <marker id="arrowhead-cyan" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="rgba(56, 189, 248, 0.9)" />
+          </marker>
+        </defs>
+        <g id="arrows-list"></g>
+        <g id="arrow-preview"></g>
+      </svg>
+    `;
+
     html += '</div>';
 
     // Board coordinates
@@ -101,6 +124,7 @@ const ChessBoard = {
 
     container.innerHTML = html;
     this.boardEl = document.getElementById('chess-board-grid');
+    this.renderArrows();
   },
 
   /**
@@ -113,6 +137,7 @@ const ChessBoard = {
     if (options.checkSquare !== undefined) this.checkSquare = options.checkSquare;
     this.selectedSquare = null;
     this.legalMoves = [];
+    this.clearAnnotations();
     this.render();
     this.bindEvents();
   },
@@ -162,14 +187,7 @@ const ChessBoard = {
   },
 
   /**
-   * Get square from board coordinates
-   */
-  squareFromCoords(rank, file) {
-    return AppConfig.FILES[file] + AppConfig.RANKS[7 - rank];
-  },
-
-  /**
-   * Get piece at a square from the current FEN
+   * Get piece at a square from current FEN
    */
   getPieceAt(square) {
     const board = this.parseFEN(this.fen);
@@ -179,7 +197,7 @@ const ChessBoard = {
   },
 
   /**
-   * Bind click and drag events
+   * Bind click, drag, and arrow drawing events
    */
   bindEvents() {
     if (!this.interactive || !this.boardEl) return;
@@ -190,43 +208,35 @@ const ChessBoard = {
       sq.addEventListener('click', (e) => this.handleClick(e, sq));
     });
 
-    // Right-click for square highlights
+    // Prevent context menu anywhere on board grid
     this.boardEl.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      const sq = e.target.closest('.square');
-      if (sq) {
-        const square = sq.dataset.square;
-        if (this.highlightedSquares.has(square)) {
-          this.highlightedSquares.delete(square);
-        } else {
-          this.highlightedSquares.set(square, 'green');
-        }
-        this.render();
-        this.bindEvents();
-      }
     });
 
-    // Drag handling on document
-    document.addEventListener('mousemove', (e) => this.handleDrag(e));
-    document.addEventListener('mouseup', (e) => this.handleDrop(e));
+    // Global document listeners (bound only once)
+    if (!this.boundDocEvents) {
+      this.boundDocEvents = true;
+      document.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+      document.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+      document.addEventListener('contextmenu', (e) => {
+        if (this.rightDrag) e.preventDefault();
+      });
+    }
   },
 
   handleClick(e, squareEl) {
-    if (this.dragging) return; // Was a drag, not a click
+    if (this.dragging?.hasMoved) return; // Was a piece drag, not a click
 
     const square = squareEl.dataset.square;
     const piece = this.getPieceAt(square);
     const turn = this.getTurn();
 
-    // Clear highlights on click
-    this.highlightedSquares.clear();
-
     if (this.selectedSquare) {
       if (this.legalMoves.includes(square)) {
-        // Make the move
+        // Make move
         this.tryMove(this.selectedSquare, square);
       } else if (piece && this.isOwnPiece(piece, turn)) {
-        // Select a different piece
+        // Select different piece
         this.selectSquare(square);
       } else {
         // Deselect
@@ -241,19 +251,75 @@ const ChessBoard = {
   },
 
   handleMouseDown(e, squareEl) {
-    if (e.button !== 0) return; // Left click only
     const square = squareEl.dataset.square;
-    const piece = this.getPieceAt(square);
-    const turn = this.getTurn();
 
-    if (piece && this.isOwnPiece(piece, turn)) {
-      this.dragging = {
+    // Right-click: Start arrow drawing or square highlight
+    if (e.button === 2) {
+      e.preventDefault();
+      this.rightDrag = {
         from: square,
-        piece,
         startX: e.clientX,
-        startY: e.clientY,
-        hasMoved: false
+        startY: e.clientY
       };
+      return;
+    }
+
+    // Left-click: Clear annotations
+    if (e.button === 0) {
+      this.clearAnnotations();
+
+      const piece = this.getPieceAt(square);
+      const turn = this.getTurn();
+
+      if (piece && this.isOwnPiece(piece, turn)) {
+        this.dragging = {
+          from: square,
+          piece,
+          startX: e.clientX,
+          startY: e.clientY,
+          hasMoved: false
+        };
+      }
+    }
+  },
+
+  handleMouseMove(e) {
+    // Arrow preview during right-click drag
+    if (this.rightDrag) {
+      const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('.square');
+      if (el && el.dataset.square !== this.rightDrag.from) {
+        this.renderArrowPreview(this.rightDrag.from, el.dataset.square);
+      } else {
+        this.clearArrowPreview();
+      }
+    }
+
+    // Piece drag handling
+    if (this.dragging) {
+      this.handleDrag(e);
+    }
+  },
+
+  handleMouseUp(e) {
+    // Right-click release: Finalize arrow or square highlight
+    if (e.button === 2 && this.rightDrag) {
+      e.preventDefault();
+      const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('.square');
+      const targetSq = el?.dataset.square || this.rightDrag.from;
+      this.clearArrowPreview();
+
+      if (targetSq === this.rightDrag.from) {
+        this.toggleSquareHighlight(targetSq);
+      } else {
+        this.toggleArrow(this.rightDrag.from, targetSq);
+      }
+      this.rightDrag = null;
+      return;
+    }
+
+    // Left-click release: Drop dragged piece
+    if (this.dragging) {
+      this.handleDrop(e);
     }
   },
 
@@ -265,10 +331,11 @@ const ChessBoard = {
 
     if (!this.dragging.hasMoved && (dx > 5 || dy > 5)) {
       this.dragging.hasMoved = true;
-      // Create floating piece
+      // Create floating SVG piece
       this.dragPieceEl = document.createElement('span');
       this.dragPieceEl.className = 'piece dragging';
-      this.dragPieceEl.textContent = AppConfig.PIECE_UNICODE[this.dragging.piece];
+      this.dragPieceEl.setAttribute('data-piece', this.dragging.piece);
+      this.dragPieceEl.innerHTML = AppConfig.getPieceSVG(this.dragging.piece);
       document.body.appendChild(this.dragPieceEl);
 
       // Select the source square to show legal moves
@@ -276,8 +343,8 @@ const ChessBoard = {
     }
 
     if (this.dragPieceEl) {
-      this.dragPieceEl.style.left = (e.clientX - 30) + 'px';
-      this.dragPieceEl.style.top = (e.clientY - 30) + 'px';
+      this.dragPieceEl.style.left = (e.clientX - 32) + 'px';
+      this.dragPieceEl.style.top = (e.clientY - 32) + 'px';
     }
   },
 
@@ -290,7 +357,6 @@ const ChessBoard = {
     }
 
     if (this.dragging.hasMoved) {
-      // Find the square under the cursor
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const squareEl = el?.closest('.square');
       if (squareEl) {
@@ -311,15 +377,110 @@ const ChessBoard = {
 
   selectSquare(square) {
     this.selectedSquare = square;
-    // In a full implementation, we'd compute legal moves client-side
-    // For now, show all squares as potentially legal and let the server validate
     this.legalMoves = this.getBasicLegalMoves(square);
     this.render();
     this.bindEvents();
   },
 
   /**
-   * Basic legal move computation (simplified — server validates)
+   * Arrow and annotation methods (Chess.com / Lichess style)
+   */
+  getSquareCenter(square) {
+    if (!square || square.length < 2) return null;
+    const file = AppConfig.FILES.indexOf(square[0]);
+    const rank = parseInt(square[1]) - 1;
+    if (file < 0 || rank < 0 || rank > 7) return null;
+    if (this.orientation === 'white') {
+      return { x: file + 0.5, y: (7 - rank) + 0.5 };
+    } else {
+      return { x: (7 - file) + 0.5, y: rank + 0.5 };
+    }
+  },
+
+  renderArrows() {
+    const listEl = document.getElementById('arrows-list');
+    if (!listEl) return;
+    let html = '';
+    for (const arrow of this.arrows) {
+      const p1 = this.getSquareCenter(arrow.from);
+      const p2 = this.getSquareCenter(arrow.to);
+      if (!p1 || !p2) continue;
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist === 0) continue;
+      const ux = dx / dist;
+      const uy = dy / dist;
+      const startX = p1.x + ux * 0.25;
+      const startY = p1.y + uy * 0.25;
+      const endX = p2.x - ux * 0.35;
+      const endY = p2.y - uy * 0.35;
+      html += `<line x1="${startX}" y1="${startY}" x2="${endX}" y2="${endY}" stroke="rgba(34, 197, 94, 0.88)" stroke-width="0.22" stroke-linecap="round" marker-end="url(#arrowhead-green)"/>`;
+    }
+    listEl.innerHTML = html;
+  },
+
+  renderArrowPreview(fromSq, toSq) {
+    const previewEl = document.getElementById('arrow-preview');
+    if (!previewEl) return;
+    const p1 = this.getSquareCenter(fromSq);
+    const p2 = this.getSquareCenter(toSq);
+    if (!p1 || !p2) return;
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist === 0) {
+      previewEl.innerHTML = '';
+      return;
+    }
+    const ux = dx / dist;
+    const uy = dy / dist;
+    const startX = p1.x + ux * 0.25;
+    const startY = p1.y + uy * 0.25;
+    const endX = p2.x - ux * 0.35;
+    const endY = p2.y - uy * 0.35;
+    previewEl.innerHTML = `<line x1="${startX}" y1="${startY}" x2="${endX}" y2="${endY}" stroke="rgba(56, 189, 248, 0.88)" stroke-width="0.22" stroke-linecap="round" stroke-dasharray="0.3 0.15" marker-end="url(#arrowhead-cyan)"/>`;
+  },
+
+  clearArrowPreview() {
+    const previewEl = document.getElementById('arrow-preview');
+    if (previewEl) previewEl.innerHTML = '';
+  },
+
+  toggleArrow(from, to) {
+    const idx = this.arrows.findIndex(a => a.from === from && a.to === to);
+    if (idx >= 0) {
+      this.arrows.splice(idx, 1);
+    } else {
+      this.arrows.push({ from, to });
+    }
+    this.renderArrows();
+  },
+
+  toggleSquareHighlight(square) {
+    const sqEl = this.boardEl?.querySelector(`.square[data-square="${square}"]`);
+    if (this.highlightedSquares.has(square)) {
+      this.highlightedSquares.delete(square);
+      sqEl?.classList.remove('highlight-green');
+    } else {
+      this.highlightedSquares.set(square, 'green');
+      sqEl?.classList.add('highlight-green');
+    }
+  },
+
+  clearAnnotations() {
+    if (this.arrows.length > 0) {
+      this.arrows = [];
+      this.renderArrows();
+    }
+    if (this.highlightedSquares.size > 0) {
+      this.highlightedSquares.clear();
+      this.boardEl?.querySelectorAll('.highlight-green').forEach(el => el.classList.remove('highlight-green'));
+    }
+  },
+
+  /**
+   * Basic legal move computation (client-side preview, server validates)
    */
   getBasicLegalMoves(fromSquare) {
     if (typeof window.Chess === 'function') {
@@ -327,9 +488,7 @@ const ChessBoard = {
         const c = new window.Chess(this.fen);
         const moves = c.moves({ square: fromSquare, verbose: true });
         return moves.map(m => m.to);
-      } catch (err) {
-        // Fallback to manual computation below
-      }
+      } catch (err) {}
     }
 
     const piece = this.getPieceAt(fromSquare);
@@ -372,14 +531,12 @@ const ChessBoard = {
       case 'p': {
         const dir = isWhite ? 1 : -1;
         const startRank = isWhite ? 1 : 6;
-        // Forward
         if (rank + dir >= 0 && rank + dir < 8 && !board[rank + dir][file]) {
           moves.push(AppConfig.FILES[file] + (rank + dir + 1));
           if (rank === startRank && !board[rank + 2 * dir][file]) {
             moves.push(AppConfig.FILES[file] + (rank + 2 * dir + 1));
           }
         }
-        // Captures
         for (const df of [-1, 1]) {
           const nr = rank + dir, nf = file + df;
           if (nr >= 0 && nr < 8 && nf >= 0 && nf < 8) {
@@ -387,7 +544,6 @@ const ChessBoard = {
             if (target && (isWhite !== (target === target.toUpperCase()))) {
               moves.push(AppConfig.FILES[nf] + (nr + 1));
             }
-            // En passant check
             const fenParts = this.fen.split(' ');
             const epSquare = fenParts[3];
             if (epSquare !== '-' && epSquare === AppConfig.FILES[nf] + (nr + 1)) {
@@ -418,7 +574,6 @@ const ChessBoard = {
             if (dr || df) addMove(rank + dr, file + df);
           }
         }
-        // Castling (simplified check)
         const castling = this.fen.split(' ')[2] || '';
         if (isWhite && rank === 0) {
           if (castling.includes('K') && !board[0][5] && !board[0][6]) moves.push('g1');
@@ -457,10 +612,16 @@ const ChessBoard = {
 
   showPromotionModal(from, to) {
     const modal = document.getElementById('promotion-modal');
+    if (!modal) return;
     modal.classList.remove('hidden');
 
+    const turn = this.getTurn();
     const pieces = modal.querySelectorAll('.promotion-piece');
     pieces.forEach(btn => {
+      const p = btn.dataset.piece;
+      const pieceKey = turn === 'w' ? p.toUpperCase() : p.toLowerCase();
+      btn.innerHTML = `<span class="piece" data-piece="${pieceKey}">${AppConfig.getPieceSVG(pieceKey)}</span>`;
+
       const handler = () => {
         const promotion = btn.dataset.piece;
         modal.classList.add('hidden');
@@ -479,8 +640,8 @@ const ChessBoard = {
    * Get captured pieces and material difference from move history
    */
   getCapturedPieces(history) {
-    const whiteCaptured = []; // Pieces white has captured (black pieces)
-    const blackCaptured = []; // Pieces black has captured (white pieces)
+    const whiteCaptured = [];
+    const blackCaptured = [];
 
     if (!history) return { whiteCaptured, blackCaptured, materialDiff: 0 };
 
