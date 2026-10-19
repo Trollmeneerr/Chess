@@ -76,25 +76,25 @@
   aspect-ratio: 1 / 1;
 }
 
-/* Board Sizing: Enlarged for desktop */
+/* Board Sizing: Enlarged for desktop and large displays */
 .chess-board.size-sm { width: 340px; height: 340px; }
 .chess-board.size-md { width: 480px; height: 480px; }
 .chess-board.size-lg {
-  width: min(720px, calc(100vw - 420px), 80vh);
-  height: min(720px, calc(100vw - 420px), 80vh);
+  width: min(800px, calc(100vw - 380px), 85vh);
+  height: min(800px, calc(100vw - 380px), 85vh);
 }
 
 @media (min-width: 1440px) {
   .chess-board.size-lg {
-    width: min(760px, calc(100vw - 460px), 82vh);
-    height: min(760px, calc(100vw - 460px), 82vh);
+    width: min(860px, calc(100vw - 400px), 88vh);
+    height: min(860px, calc(100vw - 400px), 88vh);
   }
 }
 
 @media (max-width: 1024px) {
   .chess-board.size-lg {
-    width: min(580px, calc(100vw - 320px), 72vh);
-    height: min(580px, calc(100vw - 320px), 72vh);
+    width: min(620px, calc(100vw - 300px), 74vh);
+    height: min(620px, calc(100vw - 300px), 74vh);
   }
 }
 
@@ -257,10 +257,10 @@
 }
 
 /* --- Chess Piece Vectors --- */
-/* Pieces fill approximately 90% of square dimensions */
+/* Pieces fill 100% of square dimensions */
 .piece {
-  width: 90%;
-  height: 90%;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -287,18 +287,18 @@
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
 }
 
-/* Black pieces: solid black fill with crisp outline halo so they pop on dark blue squares */
+/* Black pieces: solid dark fill with crisp outline halo so they pop on dark blue squares */
 .piece[data-piece="p"] svg,
 .piece[data-piece="n"] svg,
 .piece[data-piece="b"] svg,
 .piece[data-piece="r"] svg,
 .piece[data-piece="q"] svg,
 .piece[data-piece="k"] svg {
-  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.65)) drop-shadow(0 3px 6px rgba(0, 0, 0, 0.85));
+  filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.8)) drop-shadow(0 2px 5px rgba(0, 0, 0, 0.9));
 }
 
 .square:hover .piece {
-  transform: scale(1.05);
+  transform: scale(1.04);
 }
 
 .piece.dragging {

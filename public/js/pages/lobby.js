@@ -12,16 +12,16 @@ const LobbyPage = {
     if (isLoggedIn) {
       statsHTML = `
         <div class="stats-bar mb-3">
-          <div class="stat-card glass-panel">
+          <div class="stat-card glass-panel" style="cursor:pointer;" onclick="App.navigateTo('profile')">
             <div class="stat-value text-accent">${user.elo_rating || 800}</div>
-            <div class="stat-label">ELO Rating</div>
+            <div class="stat-label">ELO Rating (View Profile)</div>
           </div>
-          <div class="stat-card glass-panel">
+          <div class="stat-card glass-panel" style="cursor:pointer;" onclick="App.navigateTo('puzzles')">
             <div class="stat-value text-success">${user.puzzles_solved || 0}</div>
             <div class="stat-label">Puzzles Solved</div>
           </div>
-          <div class="stat-card glass-panel">
-            <div class="stat-value text-warning">${user.bots_defeated || 0}</div>
+          <div class="stat-card glass-panel" style="cursor:pointer;" onclick="App.navigateTo('bots')">
+            <div class="stat-value text-warning">${user.bots_defeated || 0} / 9</div>
             <div class="stat-label">Bots Defeated</div>
           </div>
         </div>
@@ -38,6 +38,19 @@ const LobbyPage = {
           </div>
           <h1 class="page-title">Refrigerator <span class="gradient-text">Chess</span></h1>
           <p class="page-subtitle">Tactical PvP matches, calibrated AI boss bots, and 50,000+ chess puzzles hosted on <strong>isyourrefrigerator.online</strong>.</p>
+          
+          <div class="hero-actions mt-3 mb-2" style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-fill btn-lg" id="btn-hero-play">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              <span>Play Live Match</span>
+            </button>
+            <button class="btn btn-outline btn-lg" id="btn-hero-bots">
+              <span>🤖 Challenge Bots</span>
+            </button>
+            <button class="btn btn-ghost btn-lg" id="btn-hero-puzzles">
+              <span>🧩 Solve Puzzles</span>
+            </button>
+          </div>
         </div>
 
         ${statsHTML}
@@ -55,7 +68,7 @@ const LobbyPage = {
               </div>
               <div class="lobby-card-desc">Create a private match and share the instant invite link. Real-time gameplay with custom clocks, live eval, and chat.</div>
             </div>
-            <button class="btn btn-fill btn-sm btn-block mt-2">Play PvP</button>
+            <button class="btn btn-fill btn-sm btn-block mt-2" id="btn-card-pvp">Play PvP</button>
           </div>
 
           <!-- Card: Bots -->
@@ -70,7 +83,7 @@ const LobbyPage = {
               </div>
               <div class="lobby-card-desc">Battle through 9 boss bots from 250 Frosty to 2000 Absolute Zero running calibrated Stockfish AVX2 engine.</div>
             </div>
-            <button class="btn btn-fill btn-sm btn-block mt-2">Challenge Bots</button>
+            <button class="btn btn-fill btn-sm btn-block mt-2" id="btn-card-bots">Challenge Bots</button>
           </div>
 
           <!-- Card: Puzzles -->
@@ -85,7 +98,7 @@ const LobbyPage = {
               </div>
               <div class="lobby-card-desc">Sharpen your calculation with 50,000+ starter and grandmaster puzzles. Filter by rating and climb the leaderboards.</div>
             </div>
-            <button class="btn btn-fill btn-sm btn-block mt-2">Solve Puzzles</button>
+            <button class="btn btn-fill btn-sm btn-block mt-2" id="btn-card-puzzles">Solve Puzzles</button>
           </div>
 
           <!-- Card: Ranks -->
@@ -100,7 +113,7 @@ const LobbyPage = {
               </div>
               <div class="lobby-card-desc">See top player ratings, highest puzzle streaks, and bot conqueror achievements across the whole community.</div>
             </div>
-            <button class="btn btn-outline btn-sm btn-block mt-2">View Ranks</button>
+            <button class="btn btn-outline btn-sm btn-block mt-2" id="btn-card-ranks">View Ranks</button>
           </div>
         </div>
 
@@ -125,11 +138,12 @@ const LobbyPage = {
   },
 
   bindEvents() {
-    const bindNav = (elementId, page) => {
-      const el = document.getElementById(elementId);
+    const bindClick = (id, page) => {
+      const el = document.getElementById(id);
       if (!el) return;
       el.addEventListener('click', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         window.App?.navigateTo(page);
       });
       el.addEventListener('keydown', (e) => {
@@ -140,11 +154,25 @@ const LobbyPage = {
       });
     };
 
-    bindNav('card-pvp', 'play');
-    bindNav('card-bots', 'bots');
-    bindNav('card-puzzles', 'puzzles');
-    bindNav('card-ranks', 'leaderboard');
+    // Hero buttons
+    bindClick('btn-hero-play', 'play');
+    bindClick('btn-hero-bots', 'bots');
+    bindClick('btn-hero-puzzles', 'puzzles');
 
+    // Cards and Card Buttons
+    bindClick('card-pvp', 'play');
+    bindClick('btn-card-pvp', 'play');
+
+    bindClick('card-bots', 'bots');
+    bindClick('btn-card-bots', 'bots');
+
+    bindClick('card-puzzles', 'puzzles');
+    bindClick('btn-card-puzzles', 'puzzles');
+
+    bindClick('card-ranks', 'leaderboard');
+    bindClick('btn-card-ranks', 'leaderboard');
+
+    // Auth buttons
     document.getElementById('btn-lobby-register')?.addEventListener('click', (e) => {
       e.preventDefault();
       window.Auth?.showRegisterModal();
@@ -156,3 +184,5 @@ const LobbyPage = {
     });
   }
 };
+
+window.LobbyPage = LobbyPage;
