@@ -41,6 +41,7 @@ const ChessBoard = {
     this.highlightedSquares.clear();
     this.render();
     this.bindEvents();
+    this.setupResizeObserver();
   },
 
   /**
@@ -114,7 +115,7 @@ const ChessBoard = {
 
         html += `<div class="${classes}" data-square="${sq}" data-rank="${rank}" data-file="${file}">`;
         if (piece) {
-          html += `<span class="piece" data-piece="${piece}">${AppConfig.getPieceSVG(piece)}</span>`;
+          html += `<span class="piece" data-piece="${piece}">${AppConfig.getPiece(piece)}</span>`;
         }
         html += '</div>';
       }
@@ -153,6 +154,7 @@ const ChessBoard = {
     container.innerHTML = html;
     this.boardEl = document.getElementById('chess-board-grid');
     this.renderArrows();
+    this.updateSquareSize();
   },
 
   /**
@@ -253,6 +255,40 @@ const ChessBoard = {
    */
   getTurn() {
     return this.fen.split(' ')[1] || 'w';
+  },
+
+  /**
+   * Update CSS variable --sq-size to exactly match the board's square dimensions in pixels
+   */
+  updateSquareSize() {
+    const boardEl = this.boardEl || (this.containerId && document.getElementById(this.containerId)?.querySelector('.chess-board'));
+    if (!boardEl) return;
+    const rect = boardEl.getBoundingClientRect();
+    if (rect.width > 0) {
+      const sqSize = rect.width / 8;
+      this.squareSize = sqSize;
+      boardEl.style.setProperty('--sq-size', `${sqSize}px`);
+    }
+  },
+
+  /**
+   * Setup ResizeObserver and window listener to dynamically keep piece font size matching square size
+   */
+  setupResizeObserver() {
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+    }
+    const boardEl = this.boardEl || (this.containerId && document.getElementById(this.containerId)?.querySelector('.chess-board'));
+    if (boardEl && window.ResizeObserver) {
+      this._resizeObserver = new ResizeObserver(() => {
+        this.updateSquareSize();
+      });
+      this._resizeObserver.observe(boardEl);
+    }
+    if (!this._windowResizeBound) {
+      this._windowResizeBound = true;
+      window.addEventListener('resize', () => this.updateSquareSize());
+    }
   },
 
   /**
@@ -442,11 +478,17 @@ const ChessBoard = {
 
     if (!this.dragging.hasMoved && (dx > 5 || dy > 5)) {
       this.dragging.hasMoved = true;
-      // Create floating SVG piece
+      // Create floating piece
       this.dragPieceEl = document.createElement('span');
       this.dragPieceEl.className = 'piece dragging';
       this.dragPieceEl.setAttribute('data-piece', this.dragging.piece);
-      this.dragPieceEl.innerHTML = AppConfig.getPieceSVG(this.dragging.piece);
+      this.dragPieceEl.textContent = AppConfig.getPiece(this.dragging.piece);
+
+      const sqSize = this.squareSize || (this.boardEl ? this.boardEl.clientWidth / 8 : 72);
+      this.dragPieceEl.style.width = sqSize + 'px';
+      this.dragPieceEl.style.height = sqSize + 'px';
+      this.dragPieceEl.style.fontSize = sqSize + 'px';
+
       document.body.appendChild(this.dragPieceEl);
 
       // Select source square to show legal move destinations
@@ -457,8 +499,9 @@ const ChessBoard = {
     }
 
     if (this.dragPieceEl) {
-      this.dragPieceEl.style.left = (e.clientX - 32) + 'px';
-      this.dragPieceEl.style.top = (e.clientY - 32) + 'px';
+      const halfSq = (this.squareSize || 72) / 2;
+      this.dragPieceEl.style.left = (e.clientX - halfSq) + 'px';
+      this.dragPieceEl.style.top = (e.clientY - halfSq) + 'px';
     }
   },
 
@@ -758,7 +801,7 @@ const ChessBoard = {
     pieces.forEach(btn => {
       const p = btn.dataset.piece;
       const pieceKey = turn === 'w' ? p.toUpperCase() : p.toLowerCase();
-      btn.innerHTML = `<span class="piece" data-piece="${pieceKey}">${AppConfig.getPieceSVG(pieceKey)}</span>`;
+      btn.innerHTML = `<span class="piece" data-piece="${pieceKey}">${AppConfig.getPiece(pieceKey)}</span>`;
 
       const handler = () => {
         const promotion = btn.dataset.piece;

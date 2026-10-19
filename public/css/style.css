@@ -824,12 +824,8 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.side-btn .side-piece svg {
-  width: 100%;
-  height: 100%;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  font-size: 38px;
+  line-height: 1;
 }
 
 .side-btn .side-piece-icon {
@@ -948,6 +944,8 @@ a {
 .promotion-piece .piece {
   width: 100%;
   height: 100%;
+  font-size: 48px;
+  line-height: 1;
 }
 
 .promotion-piece:hover {

@@ -75,6 +75,7 @@
   position: relative;
   aspect-ratio: 1 / 1;
   background: #0f172a;
+  container-type: inline-size;
 }
 
 /* Board Sizing: Enlarged for desktop and large displays */
@@ -114,6 +115,8 @@
   justify-content: center;
   cursor: pointer;
   transition: background-color var(--transition-fast);
+  container-type: size;
+  overflow: hidden;
 }
 
 .square-light {
@@ -252,64 +255,86 @@
   z-index: 10;
 }
 
-/* --- Chess Piece Vectors --- */
-/* Pieces fill 100% of square dimensions */
+/* --- Chess Piece Unicode Glyphs --- */
+/* Font-size is exactly 100% of the board square size */
 .piece {
   width: 100%;
   height: 100%;
+  font-size: 12.5cqw;
+  font-size: 100cqmin;
+  font-size: var(--sq-size, 100cqmin);
+  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
+  text-align: center;
   z-index: 3;
   pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
+  font-family: 'Segoe UI Symbol', 'DejaVu Sans', 'FreeSerif', 'Arial Unicode MS', 'Apple Symbols', system-ui, sans-serif;
+  font-variant-emoji: text;
+  font-style: normal;
+  font-weight: 400;
   transition: transform var(--transition-fast);
 }
 
-.piece svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-/* White pieces: clean ivory/white with drop-shadow */
-.piece[data-piece="P"] svg,
-.piece[data-piece="N"] svg,
-.piece[data-piece="B"] svg,
-.piece[data-piece="R"] svg,
-.piece[data-piece="Q"] svg,
-.piece[data-piece="K"] svg {
+/* White pieces: ♔ ♕ ♖ ♗ ♘ ♙ — clean ivory/white with contrast outline and soft shadow */
+.piece[data-piece="P"],
+.piece[data-piece="N"],
+.piece[data-piece="B"],
+.piece[data-piece="R"],
+.piece[data-piece="Q"],
+.piece[data-piece="K"],
+.piece[data-color="w"] {
+  color: #ffffff;
+  text-shadow:
+    -1px -1px 0 #0f172a,
+    1px -1px 0 #0f172a,
+    -1px 1px 0 #0f172a,
+    1px 1px 0 #0f172a,
+    0 2px 4px rgba(0, 0, 0, 0.55);
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
 }
 
-/* Black pieces: solid dark fill with crisp outline halo so they pop on dark blue squares */
-.piece[data-piece="p"] svg,
-.piece[data-piece="n"] svg,
-.piece[data-piece="b"] svg,
-.piece[data-piece="r"] svg,
-.piece[data-piece="q"] svg,
-.piece[data-piece="k"] svg {
+/* Black pieces: ♚ ♛ ♜ ♝ ♞ ♟ — solid dark charcoal with crisp halo for high visibility on dark squares */
+.piece[data-piece="p"],
+.piece[data-piece="n"],
+.piece[data-piece="b"],
+.piece[data-piece="r"],
+.piece[data-piece="q"],
+.piece[data-piece="k"],
+.piece[data-color="b"] {
+  color: #0b0f19;
+  text-shadow:
+    -1px -1px 0 rgba(255, 255, 255, 0.75),
+    1px -1px 0 rgba(255, 255, 255, 0.75),
+    -1px 1px 0 rgba(255, 255, 255, 0.75),
+    1px 1px 0 rgba(255, 255, 255, 0.75),
+    0 2px 5px rgba(0, 0, 0, 0.9);
   filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.8)) drop-shadow(0 2px 5px rgba(0, 0, 0, 0.9));
 }
 
 .square:hover .piece {
-  transform: scale(1.04);
+  transform: scale(1.05);
 }
 
 .piece.dragging {
   position: fixed;
-  width: 72px;
-  height: 72px;
+  width: var(--sq-size, 72px);
+  height: var(--sq-size, 72px);
+  font-size: var(--sq-size, 72px);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   z-index: 1000;
   pointer-events: none;
   transform: scale(1.15);
+  font-family: 'Segoe UI Symbol', 'DejaVu Sans', 'FreeSerif', 'Arial Unicode MS', 'Apple Symbols', system-ui, sans-serif;
+  font-variant-emoji: text;
   filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.75));
-}
-
-.piece.dragging svg {
-  width: 100%;
-  height: 100%;
 }
 
 /* --- Board Coordinates --- */
