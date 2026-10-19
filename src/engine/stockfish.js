@@ -1,0 +1,315 @@
+/**
+ * Stockfish Engine Manager
+ * Manages a single persistent Stockfish UCI process with FIFO request queue
+ */
+const { spawn } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+
+const MAX_DEPTH = parseInt(process.env.STOCKFISH_MAX_DEPTH) || 8;
+const HASH_MB = parseInt(process.env.STOCKFISH_HASH_MB) || 256;
+const THREADS = parseInt(process.env.STOCKFISH_THREADS) || 1;
+
+let stockfishProcess = null;
+let isReady = false;
+let requestQueue = [];
+let currentRequest = null;
+let outputBuffer = '';
+
+function getStockfishPath() {
+  // Check various locations
+  const candidates = [
+    path.join(__dirname, '..', '..', 'engine', 'stockfish'),
+    path.join(__dirname, '..', '..', 'engine', 'stockfish.exe'),
+    '/usr/local/bin/stockfish',
+    '/usr/bin/stockfish',
+    'stockfish'
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  // Fallback — might be in PATH
+  return 'stockfish';
+}
+
+function initialize() {
+  const sfPath = getStockfishPath();
+  console.log(`[Stockfish] Starting engine from: ${sfPath}`);
+  console.log(`[Stockfish] Config: Threads=${THREADS}, Hash=${HASH_MB}MB, MaxDepth=${MAX_DEPTH}`);
+
+  try {
+    stockfishProcess = spawn(sfPath, [], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    stockfishProcess.stdout.on('data', (data) => {
+      outputBuffer += data.toString();
+      processOutput();
+    });
+
+    stockfishProcess.stderr.on('data', (data) => {
+      console.error('[Stockfish STDERR]', data.toString());
+    });
+
+    stockfishProcess.on('error', (err) => {
+      console.error('[Stockfish] Process error:', err.message);
+      console.warn('[Stockfish] Engine not available — bot/analysis features disabled');
+      isReady = false;
+    });
+
+    stockfishProcess.on('exit', (code) => {
+      console.warn(`[Stockfish] Process exited with code ${code}`);
+      isReady = false;
+      // Auto-restart after 2 seconds
+      setTimeout(() => {
+        console.log('[Stockfish] Restarting...');
+        initialize();
+      }, 2000);
+    });
+
+    // Initialize UCI
+    sendCommand('uci');
+    sendCommand(`setoption name Threads value ${THREADS}`);
+    sendCommand(`setoption name Hash value ${HASH_MB}`);
+    sendCommand('setoption name Ponder value false');
+    sendCommand('setoption name Move Overhead value 10');
+    sendCommand('isready');
+  } catch (err) {
+    console.error('[Stockfish] Failed to start:', err.message);
+    console.warn('[Stockfish] Bot and analysis features will be unavailable');
+  }
+}
+
+function sendCommand(cmd) {
+  if (stockfishProcess && stockfishProcess.stdin.writable) {
+    stockfishProcess.stdin.write(cmd + '\n');
+  }
+}
+
+function processOutput() {
+  const lines = outputBuffer.split('\n');
+  outputBuffer = lines.pop(); // Keep incomplete line in buffer
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (trimmed === 'readyok') {
+      isReady = true;
+      console.log('[Stockfish] Engine ready');
+      processNextRequest();
+    }
+
+    if (currentRequest) {
+      if (currentRequest.type === 'bestmove' && trimmed.startsWith('bestmove')) {
+        const parts = trimmed.split(' ');
+        const bestmove = parts[1];
+        const ponder = parts[3] || null;
+        currentRequest.resolve({
+          bestmove,
+          ponder,
+          info: currentRequest.infoLines
+        });
+        currentRequest = null;
+        processNextRequest();
+      } else if (currentRequest.type === 'multipv' && trimmed.startsWith('bestmove')) {
+        currentRequest.resolve({
+          bestmove: trimmed.split(' ')[1],
+          pvLines: currentRequest.pvLines,
+          info: currentRequest.infoLines
+        });
+        currentRequest = null;
+        processNextRequest();
+      } else if (currentRequest.type === 'eval' && trimmed.startsWith('bestmove')) {
+        currentRequest.resolve({
+          bestmove: trimmed.split(' ')[1],
+          evaluations: currentRequest.infoLines
+        });
+        currentRequest = null;
+        processNextRequest();
+      }
+
+      if (trimmed.startsWith('info')) {
+        if (currentRequest) {
+          currentRequest.infoLines.push(trimmed);
+          // Parse MultiPV lines
+          if (trimmed.includes('multipv') && currentRequest.type === 'multipv') {
+            const pvMatch = trimmed.match(/multipv (\d+)/);
+            const scoreMatch = trimmed.match(/score (cp|mate) (-?\d+)/);
+            const pvMoveMatch = trimmed.match(/ pv (.+)/);
+            if (pvMatch && scoreMatch && pvMoveMatch) {
+              const pvNum = parseInt(pvMatch[1]);
+              const scoreType = scoreMatch[1];
+              const scoreVal = parseInt(scoreMatch[2]);
+              const moves = pvMoveMatch[1].split(' ');
+              currentRequest.pvLines[pvNum - 1] = {
+                pvNum,
+                score: scoreType === 'cp' ? scoreVal / 100 : (scoreVal > 0 ? 999 : -999),
+                scoreType,
+                scoreRaw: scoreVal,
+                bestMove: moves[0],
+                pv: moves
+              };
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+function processNextRequest() {
+  if (currentRequest || requestQueue.length === 0 || !isReady) return;
+  currentRequest = requestQueue.shift();
+
+  sendCommand('ucinewgame');
+  sendCommand('isready');
+  // We need to wait for readyok before sending position, but since
+  // we process synchronously, we'll queue the commands
+  // Actually let's do it differently — send all at once and rely on UCI protocol ordering
+  setTimeout(() => {
+    if (currentRequest) {
+      sendCommand(currentRequest.positionCmd);
+      sendCommand(currentRequest.goCmd);
+    }
+  }, 10);
+}
+
+/**
+ * Get best move for a position
+ */
+function getBestMove(fen, moves = '', depth = MAX_DEPTH, movetime = 1500, options = {}) {
+  return new Promise((resolve, reject) => {
+    if (!stockfishProcess || !isReady) {
+      return reject(new Error('Stockfish not available'));
+    }
+
+    const clampedDepth = Math.min(depth, MAX_DEPTH);
+    let positionCmd = `position fen ${fen}`;
+    if (moves) positionCmd += ` moves ${moves}`;
+
+    let goCmd = `go depth ${clampedDepth} movetime ${movetime}`;
+
+    // Apply UCI_LimitStrength if specified
+    if (options.limitStrength && options.elo) {
+      sendCommand('setoption name UCI_LimitStrength value true');
+      sendCommand(`setoption name UCI_Elo value ${options.elo}`);
+    } else {
+      sendCommand('setoption name UCI_LimitStrength value false');
+    }
+
+    const timeout = setTimeout(() => {
+      if (currentRequest && currentRequest.id === req.id) {
+        sendCommand('stop');
+      }
+    }, movetime + 500);
+
+    const req = {
+      id: Date.now() + Math.random(),
+      type: 'bestmove',
+      positionCmd,
+      goCmd,
+      infoLines: [],
+      resolve: (result) => {
+        clearTimeout(timeout);
+        resolve(result);
+      },
+      reject
+    };
+
+    requestQueue.push(req);
+    processNextRequest();
+  });
+}
+
+/**
+ * Get multiple principal variations for bot calibration
+ */
+function getMultiPV(fen, moves = '', numPV = 5, depth = 5, movetime = 800) {
+  return new Promise((resolve, reject) => {
+    if (!stockfishProcess || !isReady) {
+      return reject(new Error('Stockfish not available'));
+    }
+
+    const clampedDepth = Math.min(depth, MAX_DEPTH);
+    sendCommand(`setoption name MultiPV value ${numPV}`);
+    sendCommand('setoption name UCI_LimitStrength value false');
+
+    let positionCmd = `position fen ${fen}`;
+    if (moves) positionCmd += ` moves ${moves}`;
+    const goCmd = `go depth ${clampedDepth} movetime ${movetime}`;
+
+    const req = {
+      id: Date.now() + Math.random(),
+      type: 'multipv',
+      positionCmd,
+      goCmd,
+      infoLines: [],
+      pvLines: [],
+      resolve: (result) => {
+        // Reset MultiPV to 1
+        sendCommand('setoption name MultiPV value 1');
+        resolve(result);
+      },
+      reject
+    };
+
+    requestQueue.push(req);
+    processNextRequest();
+  });
+}
+
+/**
+ * Evaluate a position for analysis (returns eval + best line)
+ */
+function evaluate(fen, depth = MAX_DEPTH, movetime = 1500) {
+  return new Promise((resolve, reject) => {
+    if (!stockfishProcess || !isReady) {
+      return reject(new Error('Stockfish not available'));
+    }
+
+    const clampedDepth = Math.min(depth, MAX_DEPTH);
+    sendCommand('setoption name MultiPV value 1');
+    sendCommand('setoption name UCI_LimitStrength value false');
+
+    const positionCmd = `position fen ${fen}`;
+    const goCmd = `go depth ${clampedDepth} movetime ${movetime}`;
+
+    const req = {
+      id: Date.now() + Math.random(),
+      type: 'eval',
+      positionCmd,
+      goCmd,
+      infoLines: [],
+      resolve: (result) => {
+        // Parse the deepest info line for score
+        let score = null;
+        let scoreType = 'cp';
+        for (let i = result.evaluations.length - 1; i >= 0; i--) {
+          const match = result.evaluations[i].match(/score (cp|mate) (-?\d+)/);
+          if (match) {
+            scoreType = match[1];
+            score = parseInt(match[2]);
+            break;
+          }
+        }
+        resolve({
+          bestmove: result.bestmove,
+          score: scoreType === 'cp' ? score / 100 : (score > 0 ? 999 + score : -999 + score),
+          scoreType,
+          scoreRaw: score,
+          raw: result.evaluations
+        });
+      },
+      reject
+    };
+
+    requestQueue.push(req);
+    processNextRequest();
+  });
+}
+
+function isAvailable() {
+  return !!stockfishProcess && isReady;
+}
+
+module.exports = { initialize, getBestMove, getMultiPV, evaluate, isAvailable };
