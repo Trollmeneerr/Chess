@@ -141,7 +141,8 @@ async function initialize() {
         password: dbPass || '',
         waitForConnections: true,
         connectionLimit: 10,
-        queueLimit: 0
+        queueLimit: 0,
+        connectTimeout: 5000
       });
       // Test connection
       await db.execute('SELECT 1');

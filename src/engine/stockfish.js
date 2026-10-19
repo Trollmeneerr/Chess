@@ -17,23 +17,51 @@ let currentRequest = null;
 let outputBuffer = '';
 
 function getStockfishPath() {
-  // Check various locations
+  const localBin = path.join(__dirname, '..', '..', 'engine', 'stockfish');
+  const localExe = path.join(__dirname, '..', '..', 'engine', 'stockfish.exe');
+
+  if (fs.existsSync(localBin)) return localBin;
+  if (fs.existsSync(localExe)) return localExe;
+
+  // On Linux, attempt auto-download if missing
+  if (process.platform === 'linux') {
+    try {
+      const { execSync } = require('child_process');
+      const engineDir = path.join(__dirname, '..', '..', 'engine');
+      if (!fs.existsSync(engineDir)) fs.mkdirSync(engineDir, { recursive: true });
+
+      console.log('[Stockfish] Binary missing. Downloading official Stockfish 16.1 AVX2 Linux binary...');
+      const url = 'https://github.com/official-stockfish/Stockfish/releases/download/sf_16.1/stockfish-ubuntu-x86-64-avx2.tar';
+      execSync(`curl -sL --connect-timeout 15 "${url}" -o /tmp/sf.tar && tar -xf /tmp/sf.tar -C /tmp && cp $(find /tmp -type f -name "*stockfish*" | head -n 1) "${localBin}" && chmod +x "${localBin}" && rm -rf /tmp/sf*`, { stdio: 'inherit' });
+
+      if (fs.existsSync(localBin)) {
+        console.log('[Stockfish] Successfully downloaded and installed Stockfish 16.1 AVX2!');
+        return localBin;
+      }
+    } catch (err) {
+      console.warn('[Stockfish] Auto-download failed:', err.message);
+    }
+  }
+
+  // System candidates
   const candidates = [
-    path.join(__dirname, '..', '..', 'engine', 'stockfish'),
-    path.join(__dirname, '..', '..', 'engine', 'stockfish.exe'),
     '/usr/local/bin/stockfish',
-    '/usr/bin/stockfish',
-    'stockfish'
+    '/usr/bin/stockfish'
   ];
   for (const p of candidates) {
     if (fs.existsSync(p)) return p;
   }
-  // Fallback — might be in PATH
-  return 'stockfish';
+  return null;
 }
 
 function initialize() {
   const sfPath = getStockfishPath();
+  if (!sfPath) {
+    console.warn('[Stockfish] Engine binary not found — using built-in simulation engine');
+    isReady = false;
+    return;
+  }
+
   console.log(`[Stockfish] Starting engine from: ${sfPath}`);
   console.log(`[Stockfish] Config: Threads=${THREADS}, Hash=${HASH_MB}MB, MaxDepth=${MAX_DEPTH}`);
 
@@ -41,6 +69,8 @@ function initialize() {
     stockfishProcess = spawn(sfPath, [], {
       stdio: ['pipe', 'pipe', 'pipe']
     });
+
+    let binaryFailed = false;
 
     stockfishProcess.stdout.on('data', (data) => {
       outputBuffer += data.toString();
@@ -52,19 +82,19 @@ function initialize() {
     });
 
     stockfishProcess.on('error', (err) => {
+      binaryFailed = true;
       console.error('[Stockfish] Process error:', err.message);
-      console.warn('[Stockfish] Engine not available — bot/analysis features disabled');
+      console.warn('[Stockfish] Engine not available — using built-in simulation fallback');
       isReady = false;
     });
 
     stockfishProcess.on('exit', (code) => {
-      console.warn(`[Stockfish] Process exited with code ${code}`);
+      const wasRunning = isReady;
       isReady = false;
-      // Auto-restart after 2 seconds
-      setTimeout(() => {
-        console.log('[Stockfish] Restarting...');
-        initialize();
-      }, 2000);
+      if (!binaryFailed && wasRunning) {
+        console.warn(`[Stockfish] Process exited with code ${code}. Restarting in 3s...`);
+        setTimeout(() => initialize(), 3000);
+      }
     });
 
     // Initialize UCI
