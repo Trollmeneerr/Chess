@@ -84,6 +84,8 @@ app.use('/api/', apiLimiter);
 
 // Static files
 app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use('/img', express.static(path.join(__dirname, '..', 'public', 'img')));
+app.use('/img', express.static(path.join(__dirname, 'img')));
 
 // API routes
 const authRoutes = require('./routes/auth');
