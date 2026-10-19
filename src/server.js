@@ -86,6 +86,8 @@ app.use('/api/', apiLimiter);
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/img', express.static(path.join(__dirname, '..', 'public', 'img')));
 app.use('/img', express.static(path.join(__dirname, 'img')));
+app.use('/.source/img', express.static(path.join(__dirname, '..', '.source', 'img')));
+app.use('/source/img', express.static(path.join(__dirname, '..', '.source', 'img')));
 
 // API routes
 const authRoutes = require('./routes/auth');
