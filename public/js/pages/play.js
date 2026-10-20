@@ -422,9 +422,15 @@ const PlayPage = {
     this.updateCaptured(data.history || []);
 
     // Play move sounds
-    if (data.isCheck) this.playSound('check');
-    else if (data.move.captured) this.playSound('capture');
-    else this.playSound('move');
+    if (data.isCheck) {
+      this.playSound('check');
+    } else if (data.move?.san === 'O-O' || data.move?.san === 'O-O-O' || data.move?.flags?.includes('k') || data.move?.flags?.includes('q')) {
+      this.playSound('castle');
+    } else if (data.move?.captured) {
+      this.playSound('capture');
+    } else {
+      this.playSound('move');
+    }
   },
 
   updatePlayerHeaders(data) {
@@ -593,41 +599,8 @@ const PlayPage = {
   },
 
   playSound(type) {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      if (type === 'move') {
-        osc.frequency.setValueAtTime(320, ctx.currentTime);
-        gain.gain.setValueAtTime(0.15, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.08);
-      } else if (type === 'capture') {
-        osc.frequency.setValueAtTime(480, ctx.currentTime);
-        gain.gain.setValueAtTime(0.2, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.12);
-      } else if (type === 'check') {
-        osc.frequency.setValueAtTime(600, ctx.currentTime);
-        gain.gain.setValueAtTime(0.25, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.2);
-      } else if (type === 'game_over') {
-        osc.frequency.setValueAtTime(440, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.3);
-        gain.gain.setValueAtTime(0.2, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.35);
-      }
-    } catch (e) {
-      // AudioContext unavailable or blocked
+    if (window.ChessAudio) {
+      window.ChessAudio.play(type);
     }
   },
 

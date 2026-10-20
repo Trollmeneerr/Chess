@@ -11,7 +11,7 @@ const { getBotByElo } = require('../engine/bots');
 router.get('/profile/:username', optionalAuth, async (req, res) => {
   try {
     const user = await db.get(
-      'SELECT id, username, avatar_id, elo_rating, puzzles_solved, bots_defeated, created_at FROM users WHERE username = ?',
+      'SELECT id, username, avatar_id, avatar_custom, elo_rating, puzzles_solved, bots_defeated, created_at FROM users WHERE username = ?',
       [req.params.username]
     );
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -146,11 +146,232 @@ router.get('/profile/:username', optionalAuth, async (req, res) => {
 router.get('/leaderboard', async (req, res) => {
   try {
     const players = await db.all(
-      'SELECT username, avatar_id, elo_rating, puzzles_solved, bots_defeated FROM users ORDER BY elo_rating DESC LIMIT 20'
+      'SELECT username, avatar_id, avatar_custom, elo_rating, puzzles_solved, bots_defeated FROM users ORDER BY elo_rating DESC LIMIT 20'
     );
     res.json({ players });
   } catch (err) {
     res.status(500).json({ error: 'Failed to get leaderboard' });
+  }
+});
+
+// POST /api/users/avatar — Update user avatar selector or custom upload
+router.post('/avatar', authMiddleware, async (req, res) => {
+  try {
+    const { avatar_id, avatar_custom } = req.body;
+    const userId = req.user.id;
+
+    if (avatar_id !== undefined && avatar_custom !== undefined) {
+      await db.run('UPDATE users SET avatar_id = ?, avatar_custom = ? WHERE id = ?', [avatar_id, avatar_custom, userId]);
+    } else if (avatar_id !== undefined) {
+      await db.run('UPDATE users SET avatar_id = ? WHERE id = ?', [avatar_id, userId]);
+    } else if (avatar_custom !== undefined) {
+      await db.run('UPDATE users SET avatar_custom = ? WHERE id = ?', [avatar_custom, userId]);
+    }
+
+    const updated = await db.get(
+      'SELECT id, username, avatar_id, avatar_custom, elo_rating, puzzles_solved, bots_defeated FROM users WHERE id = ?',
+      [userId]
+    );
+    res.json({ success: true, user: updated });
+  } catch (err) {
+    console.error('[Users] Update avatar error:', err);
+    res.status(500).json({ error: 'Failed to update avatar' });
+  }
+});
+
+// GET /api/users/search?q=query — Search users
+router.get('/search', optionalAuth, async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q || q.length < 1) {
+      return res.json({ users: [] });
+    }
+    const currentUserId = req.user ? req.user.id : -1;
+    const users = await db.all(
+      `SELECT id, username, avatar_id, avatar_custom, elo_rating 
+       FROM users 
+       WHERE username LIKE ? AND id != ? 
+       ORDER BY elo_rating DESC LIMIT 20`,
+      [`%${q}%`, currentUserId]
+    );
+    res.json({ users });
+  } catch (err) {
+    console.error('[Users] Search error:', err);
+    res.status(500).json({ error: 'Search failed' });
+  }
+});
+
+// GET /api/users/friends — List friends and pending requests
+router.get('/friends', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Accepted friends
+    const friends = await db.all(
+      `SELECT u.id, u.username, u.avatar_id, u.avatar_custom, u.elo_rating, f.created_at AS friendship_date
+       FROM friends f
+       JOIN users u ON f.friend_id = u.id
+       WHERE f.user_id = ?
+       ORDER BY u.username ASC`,
+      [userId]
+    );
+
+    // Incoming pending requests
+    const incoming = await db.all(
+      `SELECT fr.id AS request_id, u.id AS sender_id, u.username, u.avatar_id, u.avatar_custom, u.elo_rating, fr.created_at
+       FROM friend_requests fr
+       JOIN users u ON fr.sender_id = u.id
+       WHERE fr.receiver_id = ? AND fr.status = 'pending'
+       ORDER BY fr.created_at DESC`,
+      [userId]
+    );
+
+    // Outgoing pending requests
+    const outgoing = await db.all(
+      `SELECT fr.id AS request_id, u.id AS receiver_id, u.username, u.avatar_id, u.avatar_custom, u.elo_rating, fr.created_at
+       FROM friend_requests fr
+       JOIN users u ON fr.receiver_id = u.id
+       WHERE fr.sender_id = ? AND fr.status = 'pending'
+       ORDER BY fr.created_at DESC`,
+      [userId]
+    );
+
+    res.json({ friends, incoming, outgoing });
+  } catch (err) {
+    console.error('[Users] Get friends error:', err);
+    res.status(500).json({ error: 'Failed to retrieve friends list' });
+  }
+});
+
+// POST /api/users/friends/request — Send friend request
+router.post('/friends/request', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { target_username, target_id } = req.body;
+
+    let target = null;
+    if (target_id) {
+      target = await db.get('SELECT id, username FROM users WHERE id = ?', [target_id]);
+    } else if (target_username) {
+      target = await db.get('SELECT id, username FROM users WHERE username = ?', [target_username]);
+    }
+
+    if (!target) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (target.id === userId) {
+      return res.status(400).json({ error: 'Cannot send friend request to yourself' });
+    }
+
+    // Check if already friends
+    const isFriend = await db.get('SELECT id FROM friends WHERE user_id = ? AND friend_id = ?', [userId, target.id]);
+    if (isFriend) {
+      return res.status(400).json({ error: 'Already friends' });
+    }
+
+    // Check if reciprocal request exists -> auto-accept
+    const reciprocal = await db.get(
+      'SELECT id FROM friend_requests WHERE sender_id = ? AND receiver_id = ? AND status = "pending"',
+      [target.id, userId]
+    );
+    if (reciprocal) {
+      await db.run('DELETE FROM friend_requests WHERE id = ?', [reciprocal.id]);
+      try {
+        await db.insert('INSERT INTO friends (user_id, friend_id) VALUES (?, ?)', [userId, target.id]);
+      } catch (e) {}
+      try {
+        await db.insert('INSERT INTO friends (user_id, friend_id) VALUES (?, ?)', [target.id, userId]);
+      } catch (e) {}
+      return res.json({ success: true, message: `Connected! You and ${target.username} are now friends.` });
+    }
+
+    // Check if request already sent
+    const existing = await db.get(
+      'SELECT id FROM friend_requests WHERE sender_id = ? AND receiver_id = ?',
+      [userId, target.id]
+    );
+    if (existing) {
+      return res.status(400).json({ error: 'Friend request already sent' });
+    }
+
+    await db.insert('INSERT INTO friend_requests (sender_id, receiver_id, status) VALUES (?, ?, "pending")', [userId, target.id]);
+    res.json({ success: true, message: `Friend request sent to ${target.username}` });
+  } catch (err) {
+    console.error('[Users] Friend request error:', err);
+    res.status(500).json({ error: 'Failed to send friend request' });
+  }
+});
+
+// POST /api/users/friends/accept — Accept friend request
+router.post('/friends/accept', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { request_id, sender_id } = req.body;
+
+    let reqRow = null;
+    if (request_id) {
+      reqRow = await db.get('SELECT * FROM friend_requests WHERE id = ? AND receiver_id = ?', [request_id, userId]);
+    } else if (sender_id) {
+      reqRow = await db.get(
+        'SELECT * FROM friend_requests WHERE sender_id = ? AND receiver_id = ? AND status = "pending"',
+        [sender_id, userId]
+      );
+    }
+
+    if (!reqRow) {
+      return res.status(404).json({ error: 'Friend request not found' });
+    }
+
+    const otherId = reqRow.sender_id;
+    await db.run('DELETE FROM friend_requests WHERE id = ?', [reqRow.id]);
+
+    try {
+      await db.insert('INSERT INTO friends (user_id, friend_id) VALUES (?, ?)', [userId, otherId]);
+    } catch (e) {}
+    try {
+      await db.insert('INSERT INTO friends (user_id, friend_id) VALUES (?, ?)', [otherId, userId]);
+    } catch (e) {}
+
+    res.json({ success: true, message: 'Friend request accepted' });
+  } catch (err) {
+    console.error('[Users] Accept friend error:', err);
+    res.status(500).json({ error: 'Failed to accept friend request' });
+  }
+});
+
+// POST /api/users/friends/decline — Decline friend request
+router.post('/friends/decline', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { request_id, sender_id } = req.body;
+
+    if (request_id) {
+      await db.run('DELETE FROM friend_requests WHERE id = ? AND receiver_id = ?', [request_id, userId]);
+    } else if (sender_id) {
+      await db.run('DELETE FROM friend_requests WHERE sender_id = ? AND receiver_id = ?', [sender_id, userId]);
+    }
+    res.json({ success: true, message: 'Friend request declined' });
+  } catch (err) {
+    console.error('[Users] Decline friend error:', err);
+    res.status(500).json({ error: 'Failed to decline friend request' });
+  }
+});
+
+// POST /api/users/friends/remove — Remove friend
+router.post('/friends/remove', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { friend_id } = req.body;
+    if (!friend_id) return res.status(400).json({ error: 'friend_id required' });
+
+    await db.run(
+      'DELETE FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)',
+      [userId, friend_id, friend_id, userId]
+    );
+    res.json({ success: true, message: 'Friend removed' });
+  } catch (err) {
+    console.error('[Users] Remove friend error:', err);
+    res.status(500).json({ error: 'Failed to remove friend' });
   }
 });
 

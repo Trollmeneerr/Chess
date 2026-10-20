@@ -380,16 +380,41 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
-.move-cell.active {
-  background: rgba(56, 189, 248, 0.12);
-  color: var(--cyan);
+:root {
+  --move-brilliant: #06b6d4;
+  --move-great: #2563eb;
+  --move-best: #3b82f6;
+  --move-good: #60a5fa;
+  --move-inaccuracy: #eab308;
+  --move-mistake: #f97316;
+  --move-blunder: #ef4444;
 }
 
+.move-cell.active {
+  background: rgba(59, 130, 246, 0.18);
+  color: var(--accent-blue);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.4);
+}
+
+.move-cell.brilliant { color: var(--move-brilliant); }
+.move-cell.great { color: var(--move-great); }
 .move-cell.best { color: var(--move-best); }
 .move-cell.good { color: var(--move-good); }
 .move-cell.inaccuracy { color: var(--move-inaccuracy); }
 .move-cell.mistake { color: var(--move-mistake); }
 .move-cell.blunder { color: var(--move-blunder); }
+
+.move-eval-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+}
+
+.move-eval-icon svg {
+  width: 16px;
+  height: 16px;
+}
 
 /* --- Game Controls --- */
 .game-controls {
@@ -1640,5 +1665,359 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* ====================================================================
+   Chess.com Dashboard Homescreen Layout & Friends Panel
+   ==================================================================== */
+.homescreen-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: flex-start;
+  max-width: 1380px;
+  margin: 0 auto;
+}
+
+@media (max-width: 1024px) {
+  .homescreen-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.homescreen-main {
+  min-width: 0;
+}
+
+.homescreen-sidebar-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* --- Friends Widget & Search --- */
+.friends-widget {
+  padding: 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-matte-md);
+}
+
+.friends-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.15);
+}
+
+.friends-widget-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+}
+
+.friends-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.friends-tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.friends-tab-btn.active {
+  background: var(--accent-blue);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+}
+
+.friend-search-box .input-with-icon {
+  display: flex;
+  gap: 6px;
+}
+
+.friend-search-input {
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.friend-search-results {
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.95);
+  padding: 4px;
+}
+
+.search-user-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 4px;
+  transition: background var(--transition-fast);
+  gap: 8px;
+}
+
+.search-user-card:hover {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.search-user-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.search-user-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-user-elo {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--accent-blue);
+}
+
+.friends-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.friends-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.friend-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: var(--radius-sm);
+  gap: 10px;
+  transition: all var(--transition-fast);
+}
+
+.friend-item:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.friend-avatar-wrap {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: #0f172a;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.friend-online-dot {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+}
+
+.friend-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.friend-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.friend-name:hover {
+  color: var(--accent-blue);
+  text-decoration: underline;
+}
+
+.friend-rating {
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.friend-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-xs {
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+}
+
+/* --- Avatar Selector / Upload Modal --- */
+.avatar-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 12, 20, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+
+.avatar-modal {
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg-panel);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+  padding: 24px;
+  position: relative;
+}
+
+.avatar-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+  margin-bottom: 20px;
+}
+
+.avatar-picker-choice {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #0f172a;
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 6px;
+  transition: all var(--transition-fast);
+}
+
+.avatar-picker-choice:hover {
+  border-color: var(--accent-blue);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.avatar-picker-choice.selected {
+  border-color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.5);
+}
+
+.avatar-custom-upload-box {
+  border: 2px dashed rgba(59, 130, 246, 0.35);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+  background: rgba(15, 23, 42, 0.4);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-bottom: 16px;
+}
+
+.avatar-custom-upload-box:hover {
+  border-color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+/* --- Quick Play Time Controls --- */
+.quick-play-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.time-control-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.time-control-pill:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--accent-blue);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+.time-control-pill.active {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+}
+
+.time-control-pill .tc-label {
+  font-size: 11px;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+
 
 

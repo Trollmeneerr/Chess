@@ -136,6 +136,27 @@ const ChessBoard = {
     if (!container) return;
 
     const board = this.parseFEN(this.fen);
+    const turn = this.getTurn(); // 'w' or 'b'
+
+    // Determine square of the King currently in check strictly
+    let kingInCheckSq = null;
+    if (this.inCheck) {
+      if (this.checkSquare) {
+        kingInCheckSq = this.checkSquare;
+      } else {
+        const kingChar = turn === 'w' ? 'K' : 'k';
+        for (let r = 0; r < 8; r++) {
+          for (let f = 0; f < 8; f++) {
+            if (board[r][f] === kingChar) {
+              kingInCheckSq = AppConfig.FILES[f] + AppConfig.RANKS[7 - r];
+              break;
+            }
+          }
+          if (kingInCheckSq) break;
+        }
+      }
+    }
+
     let html = '<div class="chess-board" id="chess-board-grid">';
 
     const ranks = this.orientation === 'white'
@@ -173,8 +194,10 @@ const ChessBoard = {
           classes += piece ? ' legal-capture' : ' legal-move';
         }
 
-        // Check
-        if (this.checkSquare === sq) classes += ' in-check';
+        // Check highlight - strictly applied to King currently in check
+        if (this.inCheck && kingInCheckSq === sq) {
+          classes += ' in-check';
+        }
 
         // Custom right-click square highlights
         if (this.highlightedSquares.has(sq)) {
@@ -193,23 +216,17 @@ const ChessBoard = {
         html += `<div class="${classes}" data-square="${sq}" data-rank="${rank}" data-file="${file}">`;
         html += coordHTML;
         if (piece) {
-          html += `<span class="piece" data-piece="${piece}">${AppConfig.getPiece(piece)}</span>`;
+          const isDraggingPiece = Boolean(this.dragging && this.dragging.from === sq);
+          html += `<span class="piece chess-piece${isDraggingPiece ? ' is-dragging' : ''}" data-piece="${piece}">${AppConfig.getPiece(piece)}</span>`;
         }
         html += '</div>';
       }
     }
 
-    // Arrows SVG overlay
+    // Arrows SVG overlay (800x800 coordinate system with 100px per square)
     html += `
-      <svg class="board-arrows-layer" id="board-arrows-svg" viewBox="0 0 8 8" preserveAspectRatio="none">
-        <defs>
-          <marker id="arrowhead-green" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
-            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="rgba(34, 197, 94, 0.9)" />
-          </marker>
-          <marker id="arrowhead-cyan" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
-            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="rgba(56, 189, 248, 0.9)" />
-          </marker>
-        </defs>
+      <svg class="board-arrows-layer" id="board-arrows" viewBox="0 0 800 800" preserveAspectRatio="none">
+        <defs></defs>
         <g id="arrows-list"></g>
         <g id="arrow-preview"></g>
       </svg>
@@ -217,16 +234,16 @@ const ChessBoard = {
 
     html += '</div>'; // End chess-board
 
-    // Outer wrapper with corner resize handle and toolbar
-    const toolbarHTML = this.showToolbar ? this.getScaleToolbarHTML() : '';
+    // Outer wrapper with small corner resize handle only (no bottom bar)
     const outerHTML = `
       <div class="chess-board-outer" id="chess-board-outer">
         ${html}
         <div class="board-resize-handle" id="board-resize-handle" title="Drag corner to scale board">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 14 20 20 14 20"></polyline><line x1="20" y1="20" x2="13" y2="13"></line></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+            <path d="M14 2v12H2M14 7v7H7" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
+          </svg>
         </div>
       </div>
-      ${toolbarHTML}
     `;
 
     container.innerHTML = outerHTML;
@@ -719,53 +736,22 @@ const ChessBoard = {
   },
 
   renderArrows() {
-    const listEl = document.getElementById('arrows-list');
-    if (!listEl) return;
-    let html = '';
+    const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
+    if (!svg) return;
+    svg.querySelectorAll('path, line').forEach(p => p.remove());
     for (const arrow of this.arrows) {
-      const p1 = this.getSquareCenter(arrow.from);
-      const p2 = this.getSquareCenter(arrow.to);
-      if (!p1 || !p2) continue;
-      const dx = p2.x - p1.x;
-      const dy = p2.y - p1.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist === 0) continue;
-      const ux = dx / dist;
-      const uy = dy / dist;
-      const startX = p1.x + ux * 0.25;
-      const startY = p1.y + uy * 0.25;
-      const endX = p2.x - ux * 0.35;
-      const endY = p2.y - uy * 0.35;
-      html += `<line x1="${startX}" y1="${startY}" x2="${endX}" y2="${endY}" stroke="rgba(34, 197, 94, 0.88)" stroke-width="0.22" stroke-linecap="round" marker-end="url(#arrowhead-green)"/>`;
+      drawMoveArrow(arrow.from, arrow.to, '#22c55e', false);
     }
-    listEl.innerHTML = html;
   },
 
   renderArrowPreview(fromSq, toSq) {
-    const previewEl = document.getElementById('arrow-preview');
-    if (!previewEl) return;
-    const p1 = this.getSquareCenter(fromSq);
-    const p2 = this.getSquareCenter(toSq);
-    if (!p1 || !p2) return;
-    const dx = p2.x - p1.x;
-    const dy = p2.y - p1.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist === 0) {
-      previewEl.innerHTML = '';
-      return;
-    }
-    const ux = dx / dist;
-    const uy = dy / dist;
-    const startX = p1.x + ux * 0.25;
-    const startY = p1.y + uy * 0.25;
-    const endX = p2.x - ux * 0.35;
-    const endY = p2.y - uy * 0.35;
-    previewEl.innerHTML = `<line x1="${startX}" y1="${startY}" x2="${endX}" y2="${endY}" stroke="rgba(56, 189, 248, 0.88)" stroke-width="0.22" stroke-linecap="round" stroke-dasharray="0.3 0.15" marker-end="url(#arrowhead-cyan)"/>`;
+    // Live preview during right-click drag
+    this.renderArrows();
+    drawMoveArrow(fromSq, toSq, '#38bdf8', false);
   },
 
   clearArrowPreview() {
-    const previewEl = document.getElementById('arrow-preview');
-    if (previewEl) previewEl.innerHTML = '';
+    this.renderArrows();
   },
 
   toggleArrow(from, to) {
@@ -790,13 +776,14 @@ const ChessBoard = {
   },
 
   clearAnnotations() {
-    if (this.arrows.length > 0) {
-      this.arrows = [];
-      this.renderArrows();
-    }
+    this.arrows = [];
+    const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
+    if (svg) svg.querySelectorAll('path, line').forEach(p => p.remove());
     if (this.highlightedSquares.size > 0) {
       this.highlightedSquares.clear();
-      this.boardEl?.querySelectorAll('.highlight-green').forEach(el => el.classList.remove('highlight-green'));
+      this.boardEl?.querySelectorAll('.highlight-green, .highlight-blue, .highlight-cyan, .highlight-red').forEach(el => {
+        el.classList.remove('highlight-green', 'highlight-blue', 'highlight-cyan', 'highlight-red');
+      });
     }
   },
 
@@ -1022,3 +1009,142 @@ const ChessBoard = {
     return html;
   }
 };
+
+/**
+ * 1. Draw SVG Arrows (Supports 90-Degree Knight Hooks & Blue Best Move)
+ * Expects an <svg id="board-arrows" viewBox="0 0 800 800"> overlay on the board.
+ */
+function drawMoveArrow(fromSq, toSq, color = '#3b82f6', isBestMove = false) {
+  const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
+  if (!svg || !fromSq || !toSq || fromSq.length < 2 || toSq.length < 2) return;
+  const files = 'abcdefgh';
+  
+  const orientation = (window.ChessBoard && window.ChessBoard.orientation) || 'white';
+  let c1 = files.indexOf(fromSq[0]);
+  let r1 = 8 - parseInt(fromSq[1], 10);
+  let c2 = files.indexOf(toSq[0]);
+  let r2 = 8 - parseInt(toSq[1], 10);
+
+  if (orientation === 'black') {
+    c1 = 7 - c1;
+    r1 = 7 - r1;
+    c2 = 7 - c2;
+    r2 = 7 - r2;
+  }
+  
+  const x1 = c1 * 100 + 50, y1 = r1 * 100 + 50;
+  const x2 = c2 * 100 + 50, y2 = r2 * 100 + 50;
+  const dx = c2 - c1, dy = r2 - r1;
+
+  // Ensure arrowhead marker exists
+  const cleanColor = color.replace(/[^a-zA-Z0-9]/g, '');
+  const markerId = `arrowhead-${cleanColor}`;
+  if (!document.getElementById(markerId)) {
+    const defs = svg.querySelector('defs') || svg.insertBefore(document.createElementNS('http://www.w3.org/2000/svg', 'defs'), svg.firstChild);
+    defs.innerHTML += `
+      <marker id="${markerId}" markerWidth="3.5" markerHeight="3.5" refX="2.2" refY="1.75" orient="auto">
+        <polygon points="0 0, 3.5 1.75, 0 3.5" fill="${color}" />
+      </marker>`;
+  }
+
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  const isKnightMove = (Math.abs(dx) === 1 && Math.abs(dy) === 2) || (Math.abs(dx) === 2 && Math.abs(dy) === 1);
+
+  if (isKnightMove) {
+    // 90-degree hook: travel along the 2-square axis first, then bend 90 degrees
+    const midX = Math.abs(dx) === 2 ? x2 : x1;
+    const midY = Math.abs(dy) === 2 ? y2 : y1;
+    path.setAttribute('d', `M ${x1} ${y1} L ${midX} ${midY} L ${x2} ${y2}`);
+  } else {
+    path.setAttribute('d', `M ${x1} ${y1} L ${x2} ${y2}`);
+  }
+
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', color);
+  path.setAttribute('stroke-width', isBestMove ? '20' : '16');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-linejoin', 'round');
+  path.setAttribute('opacity', '0.85');
+  path.setAttribute('marker-end', `url(#${markerId})`);
+  svg.appendChild(path);
+}
+
+/**
+ * 2. Clear Arrows & Premoves on Screen Click
+ */
+function clearAnnotationsAndPremoves() {
+  const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
+  if (svg) svg.querySelectorAll('path, line').forEach(p => p.remove());
+  document.querySelectorAll('.highlight-analysis, .highlight-premove, .square-eval-badge, .highlight-green, .highlight-cyan, .highlight-red, .premove-from, .premove-to').forEach(el => {
+    if (el.classList.contains('square-eval-badge')) {
+      el.remove();
+    } else {
+      el.classList.remove('highlight-analysis', 'highlight-premove', 'highlight-green', 'highlight-cyan', 'highlight-red', 'premove-from', 'premove-to');
+    }
+  });
+  if (window.ChessBoard) {
+    window.ChessBoard.clearAnnotations();
+    window.ChessBoard.clearPremove();
+  }
+  window.queuedPremove = null;
+}
+
+document.addEventListener('mousedown', (e) => {
+  if (e.button === 0) {
+    if (e.target.closest('input, textarea, select, .modal-overlay:not(.hidden) .modal')) return;
+    clearAnnotationsAndPremoves();
+  }
+});
+
+document.addEventListener('contextmenu', (e) => {
+  if (window.queuedPremove || (window.ChessBoard && window.ChessBoard.premove)) {
+    e.preventDefault();
+    clearAnnotationsAndPremoves(); // Right click cancels active premove
+  }
+});
+
+/**
+ * 3. Hide Piece on Original Square While Dragging
+ */
+function bindPieceDragEvents(pieceElement) {
+  pieceElement.addEventListener('dragstart', () => {
+    requestAnimationFrame(() => pieceElement.classList.add('is-dragging'));
+  });
+  pieceElement.addEventListener('dragend', () => {
+    pieceElement.classList.remove('is-dragging');
+  });
+}
+
+/**
+ * 4. Trigger Analysis Highlight & Best Move Arrow on Mistake
+ */
+function showMoveAnalysis(playedFrom, playedTo, bestFrom, bestTo, classification) {
+  clearAnnotationsAndPremoves();
+  if (playedFrom) document.querySelector(`[data-square="${playedFrom}"]`)?.classList.add('highlight-analysis');
+  if (playedTo) {
+    const toEl = document.querySelector(`[data-square="${playedTo}"]`);
+    if (toEl) {
+      toEl.classList.add('highlight-analysis');
+      const badgeSvg = window.AppConfig?.getEvalIcon(classification);
+      if (badgeSvg) {
+        const badgeEl = document.createElement('div');
+        badgeEl.className = 'square-eval-badge';
+        badgeEl.innerHTML = badgeSvg;
+        toEl.appendChild(badgeEl);
+      }
+    }
+  }
+
+  // If mistake, inaccuracy, or blunder -> show blue Best Move path
+  if (['inaccuracy', 'mistake', 'blunder'].includes(classification?.toLowerCase()) && bestFrom && bestTo) {
+    drawMoveArrow(bestFrom, bestTo, '#3b82f6', true);
+  }
+}
+
+window.drawMoveArrow = drawMoveArrow;
+window.clearAnnotationsAndPremoves = clearAnnotationsAndPremoves;
+window.bindPieceDragEvents = bindPieceDragEvents;
+window.showMoveAnalysis = showMoveAnalysis;
+ChessBoard.drawMoveArrow = drawMoveArrow;
+ChessBoard.clearAnnotationsAndPremoves = clearAnnotationsAndPremoves;
+ChessBoard.showMoveAnalysis = showMoveAnalysis;

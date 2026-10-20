@@ -696,14 +696,23 @@ const AnalysisPage = {
     const container = document.getElementById('analysis-moves-grid');
     if (!container) return;
 
+    const getMoveBadge = (m) => {
+      if (!m || !m.classification) return '';
+      const iconSvg = window.AppConfig?.getEvalIcon(m.classification);
+      if (iconSvg) {
+        return `<span class="move-eval-icon" title="${m.classification}">${iconSvg}</span>`;
+      }
+      return `<span class="badge-${m.classification}" style="font-size:11px;margin-left:4px;">${m.badge || ''}</span>`;
+    };
+
     let html = '';
     for (let i = 0; i < moves.length; i += 2) {
       const moveNum = Math.floor(i / 2) + 1;
       const w = moves[i];
       const b = moves[i + 1];
 
-      const wBadge = w ? `<span class="badge-${w.classification}" style="font-size:11px;margin-left:4px;">${w.badge}</span>` : '';
-      const bBadge = b ? `<span class="badge-${b.classification}" style="font-size:11px;margin-left:4px;">${b.badge}</span>` : '';
+      const wBadge = getMoveBadge(w);
+      const bBadge = getMoveBadge(b);
 
       html += `
         <div class="move-number">${moveNum}.</div>
@@ -757,6 +766,7 @@ const AnalysisPage = {
 
     if (index === -1) {
       ChessBoard.update(AppConfig.INITIAL_FEN, { lastMove: null });
+      if (typeof clearAnnotationsAndPremoves === 'function') clearAnnotationsAndPremoves();
       if (indicator) indicator.textContent = 'Initial Position';
       if (retryBanner) retryBanner.classList.add('hidden');
       this.updateEvalBar(0);
@@ -775,8 +785,25 @@ const AnalysisPage = {
       lastMove: { from, to }
     });
 
+    let bestFrom = null;
+    let bestTo = null;
+    if (currentMove.bestMove && currentMove.bestMove.length >= 4) {
+      bestFrom = currentMove.bestMove.substring(0, 2);
+      bestTo = currentMove.bestMove.substring(2, 4);
+    }
+
+    // Trigger Analysis Highlight & badge on destination square + Blue Best Move arrow
+    if (typeof showMoveAnalysis === 'function') {
+      showMoveAnalysis(from, to, bestFrom, bestTo, currentMove.classification);
+    }
+
+    // Always render engine's best move using a solid Blue arrow (#3b82f6)
+    if (bestFrom && bestTo && typeof drawMoveArrow === 'function') {
+      drawMoveArrow(bestFrom, bestTo, '#3b82f6', true);
+    }
+
     if (indicator) {
-      indicator.textContent = `Move ${currentMove.moveNumber}: ${currentMove.san} (${currentMove.badge})`;
+      indicator.textContent = `Move ${currentMove.moveNumber}: ${currentMove.san} (${currentMove.badge || ''})`;
     }
 
     this.updateEvalBar(currentMove.eval || 0);

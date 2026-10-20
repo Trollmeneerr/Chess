@@ -4,18 +4,26 @@
    ========================================================================= */
 
 :root {
+  /* Blue Chess.com Theme */
+  --bg-main: #0f172a;
+  --bg-panel: #1e293b;
+  --accent-blue: #3b82f6;
+  --accent-blue-hover: #2563eb;
+  --board-light: #eae9d2;
+  --board-dark: #4b7399;
+
   /* Matte Obsidian & Slate Design System */
-  --p: #0b0f19;
-  --p-surface: #111726;
-  --p-card: #141c2b;
-  --p-card-hover: #192336;
-  --p-overlay: rgba(8, 12, 20, 0.88);
+  --p: var(--bg-main);
+  --p-surface: #131d31;
+  --p-card: var(--bg-panel);
+  --p-card-hover: #26354d;
+  --p-overlay: rgba(15, 23, 42, 0.88);
   --s: #1e293b;
   --s-light: #334155;
-  --t: #0284c7;
-  --t-glow: rgba(2, 132, 199, 0.15);
-  --cyan: #38bdf8;
-  --cyan-glow: rgba(56, 189, 248, 0.15);
+  --t: #2563eb;
+  --t-glow: rgba(59, 130, 246, 0.2);
+  --cyan: var(--accent-blue);
+  --cyan-glow: rgba(59, 130, 246, 0.22);
   --green: #22c55e;
   --green-glow: rgba(34, 197, 94, 0.15);
   --red: #ef4444;
@@ -23,23 +31,23 @@
   --text: #f8fafc;
   --text-dim: #94a3b8;
   --text-faint: #64748b;
-  --glass: rgba(255, 255, 255, 0.03);
-  --glass-border: rgba(56, 189, 248, 0.22);
-  --glass-hover-border: rgba(56, 189, 248, 0.65);
-  --blue-outline: rgba(56, 189, 248, 0.35);
-  --blue-outline-glow: 0 0 16px -2px rgba(56, 189, 248, 0.35);
-  --hair: rgba(56, 189, 248, 0.12);
+  --glass: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(59, 130, 246, 0.25);
+  --glass-hover-border: rgba(59, 130, 246, 0.65);
+  --blue-outline: rgba(59, 130, 246, 0.4);
+  --blue-outline-glow: 0 0 16px -2px rgba(59, 130, 246, 0.4);
+  --hair: rgba(59, 130, 246, 0.15);
 
   /* Mapping to components */
-  --bg-deep: var(--p);
-  --bg-mid: #0e1422;
+  --bg-deep: var(--bg-main);
+  --bg-mid: #131d31;
   --bg-surface: var(--p-surface);
-  --glass-bg: var(--p-card);
+  --glass-bg: var(--bg-panel);
   --glass-bg-hover: var(--p-card-hover);
-  --accent: var(--cyan);
-  --accent-hover: #0ea5e9;
-  --accent-dark: var(--t);
-  --accent-glow: var(--cyan-glow);
+  --accent: var(--accent-blue);
+  --accent-hover: var(--accent-blue-hover);
+  --accent-dark: #1d4ed8;
+  --accent-glow: var(--t-glow);
   --text-primary: var(--text);
   --text-secondary: var(--text-dim);
   --text-muted: var(--text-faint);
@@ -296,6 +304,7 @@ a {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
+  text-decoration: none;
   transition: all var(--transition-fast);
   position: relative;
   text-align: left;

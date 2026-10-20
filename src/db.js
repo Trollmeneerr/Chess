@@ -119,6 +119,44 @@ const SCHEMA = {
       bot_elo INT NOT NULL,
       won_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
+  `,
+  friends: `
+    CREATE TABLE IF NOT EXISTS friends (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      friend_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, friend_id)
+    )
+  `,
+  friends_mysql: `
+    CREATE TABLE IF NOT EXISTS friends (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      friend_id INT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY unique_user_friend (user_id, friend_id)
+    )
+  `,
+  friend_requests: `
+    CREATE TABLE IF NOT EXISTS friend_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sender_id INTEGER NOT NULL,
+      receiver_id INTEGER NOT NULL,
+      status VARCHAR(20) DEFAULT 'pending',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(sender_id, receiver_id)
+    )
+  `,
+  friend_requests_mysql: `
+    CREATE TABLE IF NOT EXISTS friend_requests (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      sender_id INT NOT NULL,
+      receiver_id INT NOT NULL,
+      status VARCHAR(20) DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY unique_req (sender_id, receiver_id)
+    )
   `
 };
 
@@ -167,6 +205,8 @@ async function initialize() {
       await db.query(SCHEMA.puzzles_mysql);
       await db.query(SCHEMA.user_puzzle_history_mysql);
       await db.query(SCHEMA.bot_win_log_mysql);
+      await db.query(SCHEMA.friends_mysql);
+      await db.query(SCHEMA.friend_requests_mysql);
       console.log('[DB] ✓ MySQL schema initialized');
 
       await runMigrations();
@@ -212,6 +252,8 @@ async function initialize() {
   db.exec(SCHEMA.puzzles);
   db.exec(SCHEMA.user_puzzle_history);
   db.exec(SCHEMA.bot_win_log);
+  db.exec(SCHEMA.friends);
+  db.exec(SCHEMA.friend_requests);
   console.log('[DB] SQLite tables ready');
   await runMigrations();
   await seedStarterPuzzles();
@@ -241,6 +283,17 @@ async function runMigrations() {
       } catch (e) {
         console.warn('[DB] Migration note (users.avatar_id):', e.message);
       }
+
+      // 3. Check users table for avatar_custom column
+      try {
+        const [cols] = await db.query("SHOW COLUMNS FROM users LIKE 'avatar_custom'");
+        if (!cols || cols.length === 0) {
+          console.log('[DB] Running migration: Adding avatar_custom column to MySQL users table...');
+          await db.query('ALTER TABLE users ADD COLUMN avatar_custom LONGTEXT NULL');
+        }
+      } catch (e) {
+        console.warn('[DB] Migration note (users.avatar_custom):', e.message);
+      }
     } else {
       // SQLite migrations
       try {
@@ -261,8 +314,13 @@ async function runMigrations() {
           console.log('[DB] Running migration: Adding avatar_id column to SQLite users table...');
           db.exec('ALTER TABLE users ADD COLUMN avatar_id INTEGER DEFAULT 1');
         }
+        const hasAvatarCustom = pragma.some(col => col.name === 'avatar_custom');
+        if (!hasAvatarCustom) {
+          console.log('[DB] Running migration: Adding avatar_custom column to SQLite users table...');
+          db.exec('ALTER TABLE users ADD COLUMN avatar_custom TEXT');
+        }
       } catch (e) {
-        console.warn('[DB] SQLite migration note (users.avatar_id):', e.message);
+        console.warn('[DB] SQLite migration note (users.avatar):', e.message);
       }
     }
     console.log('[DB] Schema and migration checks complete');

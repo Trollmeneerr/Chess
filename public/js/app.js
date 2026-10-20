@@ -24,16 +24,39 @@ const App = {
   },
 
   bindNavigation() {
+    // Intercept clicks on internal links to route through SPA
+    document.addEventListener('click', (e) => {
+      const link = e.target.closest('a');
+      if (!link) return;
+      const href = link.getAttribute('href');
+      if (!href) return;
+
+      // Check if it's an internal application route
+      if (href.startsWith('/') && !href.startsWith('//') && !link.target && !link.hasAttribute('download')) {
+        // Exclude direct API routes or static image links
+        if (href.startsWith('/api/') || href.startsWith('/img/')) return;
+
+        e.preventDefault();
+        const cleanPath = href.replace(/^\//, '');
+        const parts = cleanPath.split('/');
+        const page = parts[0] || 'lobby';
+        const params = parts.slice(1).join('/') || null;
+        this.navigateTo(page, params);
+      }
+    });
+
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
-      item.addEventListener('click', () => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
         const page = item.dataset.page;
         this.navigateTo(page);
       });
     });
 
     // Logo click returns to lobby/home
-    document.querySelector('.sidebar-logo')?.addEventListener('click', () => {
+    document.querySelector('.sidebar-logo')?.addEventListener('click', (e) => {
+      e.preventDefault();
       this.navigateTo('lobby');
     });
 
@@ -57,24 +80,35 @@ const App = {
       params = route.split('play/')[1];
       route = 'play';
     } else if (route.startsWith('play')) {
+      params = route.substring(4).replace(/^\//, '') || null;
       route = 'play';
     } else if (route.startsWith('profile/')) {
       params = decodeURIComponent(route.split('profile/')[1]);
       route = 'profile';
     } else if (route.startsWith('profile')) {
+      params = decodeURIComponent(route.substring(7).replace(/^\//, '') || '') || null;
       route = 'profile';
+    } else if (route.startsWith('bots/')) {
+      params = route.split('bots/')[1];
+      route = 'bots';
+    } else if (route === '' || route === 'home') {
+      route = 'lobby';
     }
 
     this.renderPage(route, params);
   },
 
   navigateTo(page, params = null) {
-    if (page === 'lobby') {
-      window.location.hash = '';
-    } else if (params && typeof params === 'string') {
-      window.location.hash = `#${page}/${params}`;
-    } else {
-      window.location.hash = `#${page}`;
+    let targetPath = `/${page}`;
+    if (params && typeof params === 'string') {
+      targetPath = `/${page}/${params}`;
+    } else if (page === 'lobby' || page === '') {
+      targetPath = '/';
+    }
+
+    // Update browser URL state without page refresh
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ page, params }, '', targetPath);
     }
 
     this.renderPage(page, params);

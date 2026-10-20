@@ -80,7 +80,7 @@ const ProfilePage = {
 
     const elo = user.elo_rating || 800;
     const tier = this.getTierTitle(elo);
-    const avatar = AppConfig.getAvatarHTML(user.avatar_id || 1);
+    const avatar = AppConfig.getAvatarHTML(user.avatar_id || 1, user.avatar_custom);
 
     const totalGames = stats.total_games || 0;
     const wins = stats.wins || 0;
@@ -103,7 +103,7 @@ const ProfilePage = {
         <!-- Profile Header Glass Card -->
         <div class="profile-header-card glass-panel mb-3">
           <div class="profile-header-top">
-            <div class="profile-avatar-wrap">
+            <div class="profile-avatar-wrap" style="cursor:${isSelf ? 'pointer' : 'default'};" id="profile-avatar-clickable">
               <div class="profile-avatar">${avatar}</div>
               ${isSelf ? '<button class="profile-avatar-edit-btn" id="btn-edit-avatar" title="Change Avatar">✎</button>' : ''}
             </div>
@@ -167,6 +167,9 @@ const ProfilePage = {
           </div>
         ` : ''}
 
+        <!-- Friends & Community Widget -->
+        <div id="profile-friends-widget-wrap" class="mb-3"></div>
+
         <!-- Defeated Bot Bosses Showcase -->
         <div class="glass-panel mb-3" style="padding:18px;">
           <h3 class="section-heading mb-2">
@@ -202,6 +205,11 @@ const ProfilePage = {
       </div>
     `;
 
+    // Render Friends Widget on profile view
+    if (window.FriendsWidget) {
+      window.FriendsWidget.render('profile-friends-widget-wrap');
+    }
+
     // Filter pill listeners
     container.querySelectorAll('.pill-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -214,9 +222,14 @@ const ProfilePage = {
     });
 
     // Avatar edit modal
-    document.getElementById('btn-edit-avatar')?.addEventListener('click', () => {
-      this.openAvatarSelector();
-    });
+    if (isSelf) {
+      document.getElementById('btn-edit-avatar')?.addEventListener('click', () => {
+        this.openAvatarSelector();
+      });
+      document.getElementById('profile-avatar-clickable')?.addEventListener('click', () => {
+        this.openAvatarSelector();
+      });
+    }
 
     this.bindMatchActionButtons();
   },
@@ -556,61 +569,6 @@ const ProfilePage = {
     }
   },
 
-  openAvatarSelector() {
-    const modal = document.getElementById('auth-modal');
-    const content = document.getElementById('auth-modal-content');
-    if (!modal || !content) return;
-
-    let currentAvatar = Auth.currentUser?.avatar_id || 1;
-
-    let gridHtml = '';
-    AppConfig.AVATARS.forEach((av, idx) => {
-      const id = idx + 1;
-      gridHtml += `
-        <div class="avatar-option ${id === currentAvatar ? 'selected' : ''}" data-id="${id}" style="display:flex;align-items:center;justify-content:center;padding:4px;">
-          ${AppConfig.getPiece(av)}
-        </div>
-      `;
-    });
-
-    content.innerHTML = `
-      <div style="padding:10px;text-align:center;">
-        <h2 style="font-size:18px;margin-bottom:8px;">Choose Avatar</h2>
-        <div class="avatar-grid">
-          ${gridHtml}
-        </div>
-        <button class="btn btn-primary btn-block mt-3" id="btn-save-avatar">Save Avatar</button>
-      </div>
-    `;
-
-    content.querySelectorAll('.avatar-option').forEach(opt => {
-      opt.addEventListener('click', () => {
-        content.querySelectorAll('.avatar-option').forEach(o => o.classList.remove('selected'));
-        opt.classList.add('selected');
-        currentAvatar = parseInt(opt.dataset.id);
-      });
-    });
-
-    document.getElementById('btn-save-avatar')?.addEventListener('click', async () => {
-      try {
-        await Api.put('/auth/profile', { avatar_id: currentAvatar });
-        if (Auth.currentUser) {
-          Auth.currentUser.avatar_id = currentAvatar;
-          Auth.updateUI();
-        }
-        modal.classList.add('hidden');
-        this.render();
-      } catch (err) {
-        alert('Failed to update avatar: ' + err.message);
-      }
-    });
-
-    modal.classList.remove('hidden');
-    document.getElementById('auth-modal-close')?.addEventListener('click', () => {
-      modal.classList.add('hidden');
-    });
-  },
-
   formatTimeControl(tc) {
     if (!tc) return 'Rapid';
     if (tc === 'bullet') return '1m Bullet';
@@ -637,6 +595,158 @@ const ProfilePage = {
     const days = Math.floor(hrs / 24);
     if (days < 30) return `${days}d ago`;
     return date.toLocaleDateString();
+  },
+
+  openAvatarSelector() {
+    let selectedId = this.profileUser?.avatar_id || 1;
+    let customData = this.profileUser?.avatar_custom || null;
+
+    let modal = document.getElementById('avatar-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'avatar-modal';
+      modal.className = 'avatar-modal-overlay hidden';
+      document.body.appendChild(modal);
+    }
+
+    let choicesHTML = '';
+    AppConfig.AVATARS.forEach((key, idx) => {
+      const id = idx + 1;
+      const isSelected = (!customData && selectedId === id);
+      choicesHTML += `
+        <div class="avatar-picker-choice ${isSelected ? 'selected' : ''}" data-avatar-id="${id}" title="Avatar ${id}">
+          <div style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
+            ${AppConfig.getPiece(key)}
+          </div>
+        </div>
+      `;
+    });
+
+    modal.innerHTML = `
+      <div class="avatar-modal glass-panel">
+        <button class="modal-close" id="btn-close-avatar-modal">&times;</button>
+        <h2 style="font-size:18px;font-weight:700;margin-bottom:4px;">Customize Avatar</h2>
+        <p class="text-secondary" style="font-size:13px;margin-bottom:14px;">Select a chess piece avatar or upload your custom picture.</p>
+
+        <!-- Current Preview -->
+        <div class="d-flex align-items-center gap-3 mb-3 p-2 glass-panel" style="background:rgba(15,23,42,0.6);border-radius:10px;">
+          <div style="width:48px;height:48px;border-radius:10px;background:#0f172a;border:1px solid rgba(59,130,246,0.3);overflow:hidden;display:flex;align-items:center;justify-content:center;" id="avatar-preview-box">
+            ${AppConfig.getAvatarHTML(selectedId, customData)}
+          </div>
+          <div>
+            <div style="font-size:13px;font-weight:700;">Avatar Preview</div>
+            <div class="text-muted" style="font-size:11px;" id="avatar-preview-label">
+              ${customData ? 'Custom Picture' : `Piece Vector #${selectedId}`}
+            </div>
+          </div>
+        </div>
+
+        <!-- Custom Upload Box -->
+        <div class="avatar-custom-upload-box" id="avatar-upload-box">
+          <input type="file" id="avatar-file-input" accept="image/png, image/jpeg, image/webp, image/svg+xml" style="display:none;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-accent mb-1"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          <div style="font-size:13px;font-weight:600;">Click to Upload Custom Image</div>
+          <div class="text-muted" style="font-size:11px;margin-top:2px;">PNG, JPG, SVG, WebP (Square recommended)</div>
+        </div>
+
+        <div style="font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;">Or Select Chess Piece Avatar</div>
+        <div class="avatar-selector-grid">
+          ${choicesHTML}
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-3">
+          <button class="btn btn-outline btn-sm" id="btn-cancel-avatar">Cancel</button>
+          <button class="btn btn-primary btn-sm" id="btn-save-avatar">Save Avatar</button>
+        </div>
+      </div>
+    `;
+
+    modal.classList.remove('hidden');
+
+    const previewBox = document.getElementById('avatar-preview-box');
+    const previewLabel = document.getElementById('avatar-preview-label');
+    const fileInput = document.getElementById('avatar-file-input');
+
+    // Choice selection
+    modal.querySelectorAll('.avatar-picker-choice').forEach(choice => {
+      choice.addEventListener('click', () => {
+        modal.querySelectorAll('.avatar-picker-choice').forEach(c => c.classList.remove('selected'));
+        choice.classList.add('selected');
+        selectedId = parseInt(choice.dataset.avatarId, 10);
+        customData = null; // reset custom
+        if (previewBox) previewBox.innerHTML = AppConfig.getAvatarHTML(selectedId, null);
+        if (previewLabel) previewLabel.textContent = `Piece Vector #${selectedId}`;
+      });
+    });
+
+    // Custom upload click
+    document.getElementById('avatar-upload-box')?.addEventListener('click', () => {
+      fileInput?.click();
+    });
+
+    fileInput?.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) {
+        alert('Image must be under 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        customData = ev.target.result;
+        modal.querySelectorAll('.avatar-picker-choice').forEach(c => c.classList.remove('selected'));
+        if (previewBox) previewBox.innerHTML = `<img src="${customData}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />`;
+        if (previewLabel) previewLabel.textContent = 'Custom Uploaded Picture';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Cancel / Close
+    const closeModal = () => modal.classList.add('hidden');
+    document.getElementById('btn-close-avatar-modal')?.addEventListener('click', closeModal);
+    document.getElementById('btn-cancel-avatar')?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    // Save
+    document.getElementById('btn-save-avatar')?.addEventListener('click', async () => {
+      const saveBtn = document.getElementById('btn-save-avatar');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+      }
+      try {
+        const payload = {
+          avatar_id: selectedId,
+          avatar_custom: customData || ''
+        };
+        const res = await Api.post('/users/avatar', payload);
+        if (res.user) {
+          if (Auth.currentUser) {
+            Auth.currentUser.avatar_id = res.user.avatar_id;
+            Auth.currentUser.avatar_custom = res.user.avatar_custom;
+            Auth.updateUI();
+          }
+          this.profileUser.avatar_id = res.user.avatar_id;
+          this.profileUser.avatar_custom = res.user.avatar_custom;
+          closeModal();
+          this.renderProfileView({
+            user: this.profileUser,
+            stats: this.profileStats,
+            recent_games: this.recentGames,
+            is_current_user: true
+          });
+        }
+      } catch (err) {
+        alert(err.message || 'Failed to save avatar');
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Avatar';
+        }
+      }
+    });
   },
 
   escapeHtml(str) {

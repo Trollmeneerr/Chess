@@ -328,7 +328,8 @@ const BotsPage = {
       this.updateEvaluation(data.fen);
 
       if (data.isCheck) PlayPage.playSound('check');
-      else if (data.move.captured) PlayPage.playSound('capture');
+      else if (data.move?.san === 'O-O' || data.move?.san === 'O-O-O' || data.move?.flags?.includes('k') || data.move?.flags?.includes('q')) PlayPage.playSound('castle');
+      else if (data.move?.captured) PlayPage.playSound('capture');
       else PlayPage.playSound('move');
     });
 
@@ -344,7 +345,8 @@ const BotsPage = {
       this.updateEvaluation(data.fen);
 
       if (data.isCheck) PlayPage.playSound('check');
-      else if (data.move.captured) PlayPage.playSound('capture');
+      else if (data.move?.san === 'O-O' || data.move?.san === 'O-O-O' || data.move?.flags?.includes('k') || data.move?.flags?.includes('q')) PlayPage.playSound('castle');
+      else if (data.move?.captured) PlayPage.playSound('capture');
       else PlayPage.playSound('move');
     });
 
