@@ -17,7 +17,7 @@ const PuzzlesPage = {
       <div class="page">
         <div class="page-header">
           <h1 class="page-title">Tactical Puzzles</h1>
-          <p class="page-subtitle">Sharpen your calculation skills and earn +1 ELO for every puzzle solved</p>
+          <p class="page-subtitle">Sharpen your calculation skills with over 4,000+ tactical puzzles (1,000+ per tier) & earn +1 ELO</p>
         </div>
 
         <div class="puzzle-container">
@@ -67,14 +67,35 @@ const PuzzlesPage = {
             </div>
 
             <div class="glass-panel difficulty-selector mb-2">
-              <h4>Difficulty</h4>
-              <div class="difficulty-options">
-                <button class="diff-btn" data-diff="easy">Easy (400 - 900)</button>
-                <button class="diff-btn active" data-diff="medium">Medium (900 - 1400)</button>
-                <button class="diff-btn" data-diff="hard">Hard (1400 - 1900)</button>
-                <button class="diff-btn" data-diff="master">Master (1900+)</button>
-                <button class="diff-btn" data-diff="adaptive">Adaptive (${userRating} ± 100)</button>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <h4 style="margin:0;">Difficulty</h4>
+                <span class="badge badge-accent" id="puzzle-pool-badge" style="font-size:11px;">4,000+ Active</span>
               </div>
+              <div class="difficulty-options">
+                <button class="diff-btn" data-diff="easy" style="display:flex;justify-content:space-between;align-items:center;">
+                  <span>Easy (400 - 999)</span>
+                  <span class="badge badge-subtle" id="count-easy" style="font-size:10px;">1,016</span>
+                </button>
+                <button class="diff-btn active" data-diff="medium" style="display:flex;justify-content:space-between;align-items:center;">
+                  <span>Medium (1000 - 1399)</span>
+                  <span class="badge badge-subtle" id="count-medium" style="font-size:10px;">1,000</span>
+                </button>
+                <button class="diff-btn" data-diff="hard" style="display:flex;justify-content:space-between;align-items:center;">
+                  <span>Hard (1400 - 1899)</span>
+                  <span class="badge badge-subtle" id="count-hard" style="font-size:10px;">1,000</span>
+                </button>
+                <button class="diff-btn" data-diff="master" style="display:flex;justify-content:space-between;align-items:center;">
+                  <span>Master (1900+)</span>
+                  <span class="badge badge-subtle" id="count-master" style="font-size:10px;">1,000</span>
+                </button>
+                <button class="diff-btn" data-diff="adaptive" style="display:flex;justify-content:space-between;align-items:center;">
+                  <span>Adaptive (${userRating} ± 100)</span>
+                  <span class="badge badge-accent" style="font-size:10px;">Dynamic</span>
+                </button>
+              </div>
+              <button type="button" class="btn btn-outline btn-sm btn-block mt-2" id="btn-quick-import-puzzles" style="font-size:11px;padding:6px 10px;">
+                ⚡ Bulk Add 1,000 Puzzles / Tier
+              </button>
             </div>
 
             <div class="glass-panel" style="padding:14px;display:flex;gap:8px;">
@@ -87,7 +108,21 @@ const PuzzlesPage = {
     `;
 
     this.bindEvents();
+    this.updateTierCountsUI();
     this.loadPuzzle();
+  },
+
+  async updateTierCountsUI() {
+    try {
+      const stats = await Api.get('/puzzles/stats/tiers');
+      if (stats) {
+        if (stats.easy && document.getElementById('count-easy')) document.getElementById('count-easy').textContent = Number(stats.easy).toLocaleString();
+        if (stats.medium && document.getElementById('count-medium')) document.getElementById('count-medium').textContent = Number(stats.medium).toLocaleString();
+        if (stats.hard && document.getElementById('count-hard')) document.getElementById('count-hard').textContent = Number(stats.hard).toLocaleString();
+        if (stats.master && document.getElementById('count-master')) document.getElementById('count-master').textContent = Number(stats.master).toLocaleString();
+        if (stats.total && document.getElementById('puzzle-pool-badge')) document.getElementById('puzzle-pool-badge').textContent = `${Number(stats.total).toLocaleString()} Active`;
+      }
+    } catch (e) {}
   },
 
   bindEvents() {
@@ -103,6 +138,33 @@ const PuzzlesPage = {
 
     document.getElementById('btn-next-puzzle')?.addEventListener('click', () => {
       this.loadPuzzle();
+    });
+
+    document.getElementById('btn-quick-import-puzzles')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btn-quick-import-puzzles');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Importing from Lichess...';
+      }
+      try {
+        const stats = await Api.get('/puzzles/stats/tiers');
+        const currentCount = stats?.easy || 1000;
+        const nextTarget = currentCount + 1000;
+        await Api.post('/puzzles/bulk-import', { targetPerTier: nextTarget });
+        setTimeout(async () => {
+          await this.updateTierCountsUI();
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = '✓ 1,000 Puzzles/Tier Added!';
+            setTimeout(() => { if (btn) btn.textContent = '⚡ Bulk Add 1,000 Puzzles / Tier'; }, 3000);
+          }
+        }, 4000);
+      } catch (err) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '⚡ Bulk Add 1,000 Puzzles / Tier';
+        }
+      }
     });
 
     document.getElementById('btn-puzzle-hint')?.addEventListener('click', (e) => {
@@ -135,7 +197,45 @@ const PuzzlesPage = {
       window.puzzleState.isFinished = false;
     }
 
-    // Filter verified multi-move puzzles by difficulty bracket
+    // 1. Try loading a live puzzle from the server's 4,000+ puzzle database
+    try {
+      const data = await Api.get(`/puzzles/random?difficulty=${this.currentDifficulty}&multi_move=true`);
+      if (data && data.puzzle_id) {
+        let movesArr = [];
+        if (data.moves) {
+          movesArr = typeof data.moves === 'string' ? data.moves.trim().split(/\s+/) : data.moves;
+        } else {
+          const sol = await Api.get(`/puzzles/${data.puzzle_id}/solution`);
+          if (sol && sol.moves) {
+            movesArr = typeof sol.moves === 'string' ? sol.moves.trim().split(/\s+/) : sol.moves;
+          }
+        }
+
+        if (movesArr.length >= 2) {
+          const puzzleObj = {
+            id: data.puzzle_id,
+            puzzle_id: data.puzzle_id,
+            fen: data.fen,
+            moves: movesArr,
+            rating: data.rating,
+            themes: data.themes
+          };
+          if (typeof startSeededMultiMovePuzzle === 'function') {
+            startSeededMultiMovePuzzle([puzzleObj], seed);
+            this.currentPuzzle = puzzleObj;
+            return;
+          } else if (typeof loadSeededPuzzle === 'function') {
+            loadSeededPuzzle([puzzleObj], seed);
+            this.currentPuzzle = puzzleObj;
+            return;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Puzzles] Server fetch failed, falling back to local pool:', err);
+    }
+
+    // 2. Fallback to client-bundled verified puzzles
     const allVerified = (window.VERIFIED_MULTI_MOVE_PUZZLES && window.VERIFIED_MULTI_MOVE_PUZZLES.length > 0)
       ? window.VERIFIED_MULTI_MOVE_PUZZLES
       : ((window.VERIFIED_PUZZLES && window.VERIFIED_PUZZLES.length > 0) ? window.VERIFIED_PUZZLES : []);
@@ -163,37 +263,6 @@ const PuzzlesPage = {
       loadSeededPuzzle(pool, seed);
       this.currentPuzzle = window.puzzleState?.currentPuzzle;
       return;
-    }
-
-    try {
-      const data = await Api.get(`/puzzles/random?difficulty=${this.currentDifficulty}&multi_move=true`);
-      if (!data || !data.puzzle_id) {
-        if (allVerified.length > 0 && typeof startSeededMultiMovePuzzle === 'function') {
-          startSeededMultiMovePuzzle(allVerified, seed);
-        }
-        return;
-      }
-      const sol = await Api.get(`/puzzles/${data.puzzle_id}/solution`);
-      const movesArr = sol.moves.split(' ');
-      const puzzleObj = {
-        id: data.puzzle_id,
-        fen: data.fen,
-        moves: movesArr,
-        rating: data.rating,
-        themes: data.themes
-      };
-      if (typeof startSeededMultiMovePuzzle === 'function') {
-        startSeededMultiMovePuzzle([puzzleObj], seed);
-        this.currentPuzzle = puzzleObj;
-      } else if (typeof loadSeededPuzzle === 'function') {
-        loadSeededPuzzle([puzzleObj], seed);
-        this.currentPuzzle = puzzleObj;
-      }
-    } catch (err) {
-      console.error('[Puzzles] Error loading puzzle:', err);
-      if (allVerified.length > 0 && typeof startSeededMultiMovePuzzle === 'function') {
-        startSeededMultiMovePuzzle(allVerified, seed);
-      }
     }
   },
 

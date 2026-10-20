@@ -61,20 +61,11 @@ async function main() {
     }
     console.log(`[Seed] Finished seeding ${count} puzzles from CSV.`);
   } else {
-    console.log(`[Seed] Seeding ${STARTER_PUZZLES.length} curated starter puzzles...`);
-    let count = 0;
-    for (const p of STARTER_PUZZLES) {
-      try {
-        await db.insert(
-          'INSERT INTO puzzles (puzzle_id, fen, moves, rating, themes) VALUES (?, ?, ?, ?, ?)',
-          [p.puzzle_id, p.fen, p.moves, p.rating, p.themes]
-        );
-        count++;
-      } catch (err) {
-        // ignore duplicate
-      }
-    }
-    console.log(`[Seed] Finished seeding ${count} starter puzzles.`);
+    const targetArg = args.find(a => a.startsWith('--target='));
+    const target = targetArg ? parseInt(targetArg.split('=')[1], 10) : 1000;
+    console.log(`[Seed] Running fast bulk puzzle importer (target: ${target} per tier)...`);
+    const { runImport } = require('../../scripts/import-puzzles');
+    await runImport(target);
   }
 
   process.exit(0);

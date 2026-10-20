@@ -8,11 +8,11 @@ const { authMiddleware, optionalAuth } = require('../middleware/auth');
 
 const PUZZLE_ELO_REWARD = parseInt(process.env.PUZZLE_ELO_REWARD) || 1;
 
-// Difficulty ranges
+// Difficulty ranges aligned with exact tier brackets (1,000+ per tier)
 const DIFFICULTY_RANGES = {
-  easy: { min: 400, max: 900 },
-  medium: { min: 900, max: 1400 },
-  hard: { min: 1400, max: 1900 },
+  easy: { min: 400, max: 999 },
+  medium: { min: 1000, max: 1399 },
+  hard: { min: 1400, max: 1899 },
   master: { min: 1900, max: 3500 },
   adaptive: null // computed from user ELO
 };
@@ -57,14 +57,12 @@ router.get('/random', optionalAuth, async (req, res) => {
       return res.status(404).json({ error: 'No puzzles found for this difficulty range' });
     }
 
-    // Don't send the solution moves to the client initially
     res.json({
       puzzle_id: puzzle.puzzle_id,
       fen: puzzle.fen,
+      moves: puzzle.moves,
       rating: puzzle.rating,
       themes: puzzle.themes,
-      // The first move is the "setup" move that the opponent just played
-      // Remaining moves are the solution
       total_moves: puzzle.moves.split(' ').length
     });
   } catch (err) {
@@ -88,6 +86,46 @@ router.get('/:puzzleId/solution', optionalAuth, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to get puzzle solution' });
+  }
+});
+
+// GET /api/puzzles/stats/tiers — Get puzzle counts by difficulty tier
+router.get('/stats/tiers', optionalAuth, async (req, res) => {
+  try {
+    const counts = await db.get(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN rating < 1000 THEN 1 ELSE 0 END) as easy,
+        SUM(CASE WHEN rating >= 1000 AND rating < 1400 THEN 1 ELSE 0 END) as medium,
+        SUM(CASE WHEN rating >= 1400 AND rating < 1900 THEN 1 ELSE 0 END) as hard,
+        SUM(CASE WHEN rating >= 1900 THEN 1 ELSE 0 END) as master
+      FROM puzzles
+    `);
+    res.json(counts || { total: 0, easy: 0, medium: 0, hard: 0, master: 0 });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch puzzle tier stats' });
+  }
+});
+
+// POST /api/puzzles/bulk-import — Quick bulk puzzle importer
+router.post('/bulk-import', async (req, res) => {
+  try {
+    const target = parseInt(req.body?.targetPerTier || req.query?.target) || 1000;
+    const { runImport } = require('../../scripts/import-puzzles');
+
+    // Run import
+    runImport(target).then(puzzles => {
+      console.log(`[API] Bulk import finished: ${puzzles.length} puzzles now in database`);
+    }).catch(err => {
+      console.error('[API] Bulk import error:', err);
+    });
+
+    res.json({
+      success: true,
+      message: `Bulk import for at least ${target} puzzles per tier started.`
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to initiate bulk import: ' + err.message });
   }
 });
 

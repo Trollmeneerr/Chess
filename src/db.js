@@ -73,7 +73,8 @@ const SCHEMA = {
       rating INTEGER DEFAULT 1200,
       themes TEXT,
       popularity INTEGER DEFAULT 0
-    )
+    );
+    CREATE INDEX IF NOT EXISTS idx_puzzles_rating ON puzzles(rating);
   `,
   puzzles_mysql: `
     CREATE TABLE IF NOT EXISTS puzzles (
@@ -83,7 +84,8 @@ const SCHEMA = {
       moves TEXT NOT NULL,
       rating INT DEFAULT 1200,
       themes TEXT,
-      popularity INT DEFAULT 0
+      popularity INT DEFAULT 0,
+      KEY idx_puzzles_rating (rating)
     )
   `,
   user_puzzle_history: `
@@ -349,23 +351,49 @@ async function runMigrations() {
 
 async function seedStarterPuzzles() {
   try {
-    const { STARTER_PUZZLES } = require('./engine/starter-puzzles');
+    const seedPath = path.join(__dirname, '..', 'data', 'puzzles-seed.json');
+    let puzzlesToSeed = [];
+
+    if (fs.existsSync(seedPath)) {
+      try {
+        puzzlesToSeed = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
+      } catch (e) {
+        console.warn('[DB] Failed to parse puzzles-seed.json, falling back to starter puzzles');
+      }
+    }
+
+    if (!puzzlesToSeed || puzzlesToSeed.length === 0) {
+      const { STARTER_PUZZLES } = require('./engine/starter-puzzles');
+      puzzlesToSeed = STARTER_PUZZLES;
+    }
+
     const existing = await get('SELECT COUNT(*) as count FROM puzzles');
-    if (existing && existing.count >= STARTER_PUZZLES.length) return;
+    if (existing && existing.count >= puzzlesToSeed.length) return;
 
-    if (existing && existing.count > 0) {
-      console.log(`[DB] Upgrading existing puzzles (${existing.count}) to verified multi-move dataset (${STARTER_PUZZLES.length})...`);
-      await run('DELETE FROM puzzles');
+    console.log(`[DB] Seeding ${puzzlesToSeed.length} puzzles into database (current count: ${existing?.count || 0})...`);
+
+    if (!isMySQL && db && typeof db.transaction === 'function') {
+      const insertStmt = db.prepare(`
+        INSERT OR IGNORE INTO puzzles (puzzle_id, fen, moves, rating, themes, popularity)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      const insertMany = db.transaction((puzzles) => {
+        for (const p of puzzles) {
+          insertStmt.run(p.puzzle_id, p.fen, p.moves, p.rating, p.themes, p.popularity || 0);
+        }
+      });
+      insertMany(puzzlesToSeed);
+    } else {
+      for (const p of puzzlesToSeed) {
+        await insert(
+          'INSERT OR IGNORE INTO puzzles (puzzle_id, fen, moves, rating, themes, popularity) VALUES (?, ?, ?, ?, ?, ?)',
+          [p.puzzle_id, p.fen, p.moves, p.rating, p.themes, p.popularity || 0]
+        );
+      }
     }
 
-    console.log(`[DB] Seeding ${STARTER_PUZZLES.length} verified multi-move starter puzzles...`);
-    for (const p of STARTER_PUZZLES) {
-      await insert(
-        'INSERT INTO puzzles (puzzle_id, fen, moves, rating, themes, popularity) VALUES (?, ?, ?, ?, ?, ?)',
-        [p.puzzle_id, p.fen, p.moves, p.rating, p.themes, p.popularity || 0]
-      );
-    }
-    console.log('[DB] Verified multi-move starter puzzles seeded successfully');
+    const finalCount = await get('SELECT COUNT(*) as count FROM puzzles');
+    console.log(`[DB] ✓ Successfully seeded database with ${finalCount?.count || puzzlesToSeed.length} active puzzles`);
   } catch (err) {
     console.error('[DB] Failed to seed starter puzzles:', err.message);
   }
