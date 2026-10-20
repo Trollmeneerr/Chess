@@ -120,7 +120,7 @@ const FriendsWidget = {
         ${!isLoggedIn ? `
           <div class="friends-widget-auth-prompt text-center p-3">
             <p class="text-secondary mb-2" style="font-size:13px;">Sign in to search friends, send invites, and play live matches.</p>
-            <button class="btn btn-primary btn-sm btn-block" onclick="Auth.showLoginModal()">Sign In</button>
+            <button class="btn btn-primary btn-sm btn-block" data-action="show-login">Sign In</button>
           </div>
         ` : `
           <!-- Friend Widget Tabs -->
@@ -180,11 +180,11 @@ const FriendsWidget = {
             <span class="friend-online-dot"></span>
           </div>
           <div class="friend-meta">
-            <div class="friend-name" onclick="App.navigateTo('profile', '${encodeURIComponent(f.username)}')">${f.username}</div>
+            <div class="friend-name" data-action="open-profile" data-profile="${encodeURIComponent(f.username)}" style="cursor:pointer;">${f.username}</div>
             <div class="friend-rating text-muted">${f.elo_rating || 800} ELO</div>
           </div>
           <div class="friend-actions">
-            <button class="btn btn-outline btn-xs friend-challenge-btn" title="Challenge ${f.username}" onclick="App.navigateTo('play')">Play</button>
+            <button class="btn btn-outline btn-xs friend-challenge-btn" title="Challenge ${f.username}" data-action="play-online">Play</button>
             <button class="btn btn-ghost btn-xs text-muted friend-remove-btn" title="Remove Friend" data-remove-id="${f.id}">&times;</button>
           </div>
         </div>

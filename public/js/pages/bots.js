@@ -289,14 +289,14 @@ const BotsPage = {
                 </div>
               </div>
 
-              <a href="/analysis" data-action="game-review" onclick="if(typeof switchMode==='function')switchMode('analysis')" class="btn-primary review-cta">
+              <a href="/analysis" data-action="game-review" class="btn-primary review-cta">
                 <strong>Game Review</strong>
                 <span>See top 3 lines & best blue moves</span>
               </a>
 
               <div class="post-game-actions">
-                <button data-action="play-bots" onclick="startNewGame()" class="btn-secondary">New Game</button>
-                <button onclick="requestRematch()" class="btn-secondary">Rematch</button>
+                <button data-action="play-bots" class="btn-secondary">New Game</button>
+                <button data-action="request-rematch" class="btn-secondary">Rematch</button>
               </div>
             </section>
 
@@ -322,7 +322,7 @@ const BotsPage = {
             <div class="game-controls glass-panel">
               <button class="btn btn-danger btn-sm" id="btn-bot-resign">Resign</button>
               <button class="btn btn-ghost btn-sm" id="btn-bot-flip">Flip</button>
-              <button class="btn btn-primary btn-sm" onclick="App.navigateTo('bots')">Roster</button>
+              <button class="btn btn-primary btn-sm" data-action="play-bots">Roster</button>
             </div>
           </div>
         </div>
@@ -541,6 +541,12 @@ const BotsPage = {
       onGameEnd(title, data.reason ? `by ${data.reason}` : (data.result ? `Game Result: ${data.result}` : 'Game Concluded'), wAcc, bAcc);
     }
 
+    window.lastFinishedGame = {
+      pgn: data.pgn,
+      inviteCode: this.activeGame?.gameId,
+      user_color: this.activeGame?.playerColor || 'white'
+    };
+
     const boardWrap = document.querySelector('.board-wrapper');
     if (boardWrap) {
       const overlay = document.createElement('div');
@@ -553,8 +559,8 @@ const BotsPage = {
           <div class="elo-change ${eloClass}">${eloText}</div>
           <div class="game-over-actions">
             <button class="btn btn-primary" id="btn-bot-review">Game Review</button>
-            <button class="btn btn-ghost" onclick="BotsPage.startBotMatch(${this.activeGame?.botElo})">Rematch</button>
-            <button class="btn btn-ghost" onclick="App.navigateTo('bots')">Roster</button>
+            <button class="btn btn-ghost" id="btn-bot-rematch">Rematch</button>
+            <button class="btn btn-ghost" data-action="play-bots">Roster</button>
           </div>
         </div>
       `;
@@ -562,6 +568,10 @@ const BotsPage = {
 
       document.getElementById('btn-bot-review')?.addEventListener('click', () => {
         App.navigateTo('analysis', { pgn: data.pgn, inviteCode: this.activeGame?.gameId });
+      });
+
+      document.getElementById('btn-bot-rematch')?.addEventListener('click', () => {
+        BotsPage.startBotMatch(this.activeGame?.botElo);
       });
     }
   }

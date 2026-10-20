@@ -131,8 +131,8 @@ const AnalysisPage = {
           <h2>Sign In to Review Your Games</h2>
           <p class="text-secondary mt-1">Log in to view all your recent PvP and AI Bot matches, or use the tabs above to import a PGN or browse database records.</p>
           <div class="mt-3" style="display:flex;gap:10px;justify-content:center;">
-            <button class="btn btn-primary" onclick="Auth.showLoginModal()">Sign In</button>
-            <button class="btn btn-outline" onclick="AnalysisPage.switchTab('custom-pgn')">Paste Custom PGN</button>
+            <button class="btn btn-primary" data-action="show-login">Sign In</button>
+            <button class="btn btn-outline" data-action="switch-tab" data-tab="custom-pgn">Paste Custom PGN</button>
           </div>
         </div>
       `;
@@ -146,8 +146,8 @@ const AnalysisPage = {
           <h3>No Finished Games Yet</h3>
           <p class="text-secondary mt-1">Play a match against AI Bots or a friend to record and review games here.</p>
           <div class="mt-3" style="display:flex;gap:10px;justify-content:center;">
-            <button class="btn btn-primary" onclick="App.navigateTo('bots')">Play AI Bots</button>
-            <button class="btn btn-outline" onclick="App.navigateTo('play')">Play Online</button>
+            <button class="btn btn-primary" data-action="play-bots">Play AI Bots</button>
+            <button class="btn btn-outline" data-action="play-online">Play Online</button>
           </div>
         </div>
       `;
@@ -226,7 +226,7 @@ const AnalysisPage = {
           <div style="font-size:36px;margin-bottom:8px;">💾</div>
           <h3>No Analyzed Games Stored in Database</h3>
           <p class="text-secondary mt-1">Select a game from your history or import a PGN to analyze and store it in the database for nodes.</p>
-          <button class="btn btn-primary mt-2" onclick="AnalysisPage.switchTab('my-matches')">Choose a Match to Review</button>
+          <button class="btn btn-primary mt-2" data-action="switch-tab" data-tab="my-matches">Choose a Match to Review</button>
         </div>
       `;
       return;
@@ -284,13 +284,17 @@ const AnalysisPage = {
         <div style="font-size:13px;color:var(--text-secondary);">
           Showing <strong style="color:var(--cyan);">${this.storedDbGames.length}</strong> games stored in the database with cached Stockfish evaluations. These records are permanently persisted and accessible by all cluster nodes.
         </div>
-        <button class="btn btn-outline btn-sm" onclick="AnalysisPage.fetchDataAndRender()">🔄 Refresh Database List</button>
+        <button class="btn btn-outline btn-sm" id="btn-refresh-db-list">🔄 Refresh Database List</button>
       </div>
 
       <div class="review-match-grid">
         ${rowsHtml}
       </div>
     `;
+
+    container.querySelector('#btn-refresh-db-list')?.addEventListener('click', () => {
+      this.fetchDataAndRender();
+    });
 
     container.querySelectorAll('.btn-load-stored').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -333,7 +337,12 @@ const AnalysisPage = {
         </div>
 
         <div class="form-group">
-          <label class="form-label">Game PGN Notation</label>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label class="form-label" style="margin:0;">Game PGN Notation</label>
+            <button type="button" class="btn btn-ghost btn-xs" id="btn-load-sample-pgn" style="font-size:11px;color:var(--cyan);">
+              ⚡ Paste Sample Match
+            </button>
+          </div>
           <textarea class="form-input" id="pgn-input" rows="7" placeholder="1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. O-O Nf6 ..."></textarea>
         </div>
 
@@ -349,6 +358,13 @@ const AnalysisPage = {
         this.startAnalysis(null, code, false);
       } else {
         alert('Please enter a match invite code.');
+      }
+    });
+
+    document.getElementById('btn-load-sample-pgn')?.addEventListener('click', () => {
+      const pgnEl = document.getElementById('pgn-input');
+      if (pgnEl) {
+        pgnEl.value = '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Be3 e5 7. Nb3 Be6 8. Qd2 Nbd7 9. f3 b5 10. O-O-O Be7';
       }
     });
 
@@ -527,10 +543,16 @@ const AnalysisPage = {
         <div class="text-danger" style="font-size:18px;font-weight:700;">Review Failed</div>
         <div class="text-muted mt-2">${this.escapeHtml(err.message || 'Error processing game review with engine.')}</div>
         <div class="mt-3" style="display:flex;gap:10px;justify-content:center;">
-          <button class="btn btn-primary" onclick="AnalysisPage.renderSelectorView()">Back to Match Selector</button>
-          <button class="btn btn-outline" onclick="AnalysisPage.startAnalysis('${encodeURIComponent(this.pgn)}', '${inviteCode}', true)">Retry with Engine</button>
+          <button class="btn btn-primary" id="btn-err-selector">Back to Match Selector</button>
+          <button class="btn btn-outline" id="btn-err-retry">Retry with Engine</button>
         </div>
       `;
+      document.getElementById('btn-err-selector')?.addEventListener('click', () => {
+        this.renderSelectorView();
+      });
+      document.getElementById('btn-err-retry')?.addEventListener('click', () => {
+        this.startAnalysis(this.pgn, inviteCode, true);
+      });
     }
   },
 
@@ -684,14 +706,14 @@ const AnalysisPage = {
               </div>
             </div>
 
-            <a href="/analysis" data-action="game-review" onclick="if(typeof switchMode==='function')switchMode('analysis')" class="btn-primary review-cta">
+            <a href="/analysis" data-action="game-review" class="btn-primary review-cta">
               <strong>Game Review</strong>
               <span>See top 3 lines & best blue moves</span>
             </a>
 
             <div class="post-game-actions">
-              <button data-action="play-online" onclick="startNewGame()" class="btn-secondary">New Game</button>
-              <button onclick="requestRematch()" class="btn-secondary">Rematch</button>
+              <button data-action="play-online" class="btn-secondary">New Game</button>
+              <button data-action="request-rematch" class="btn-secondary">Rematch</button>
             </div>
           </section>
 

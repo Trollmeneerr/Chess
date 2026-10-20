@@ -25,8 +25,8 @@ const ProfilePage = {
             <h2 class="page-title">User Profile</h2>
             <p class="text-secondary mt-1">Sign in to view your rating, match archives, and boss defeat achievements.</p>
             <div class="mt-3" style="display:flex;gap:10px;justify-content:center;">
-              <button class="btn btn-primary" onclick="Auth.showLoginModal()">Sign In</button>
-              <button class="btn btn-outline" onclick="App.navigateTo('leaderboard')">View Top Players</button>
+              <button class="btn btn-primary" data-action="show-login">Sign In</button>
+              <button class="btn btn-outline" data-action="open-leaderboard">View Top Players</button>
             </div>
           </div>
         </div>
@@ -54,7 +54,7 @@ const ProfilePage = {
       document.getElementById('profile-loading').innerHTML = `
         <div class="text-danger" style="font-size:18px;font-weight:700;">Player Not Found</div>
         <div class="text-muted mt-1">Could not find user "${this.escapeHtml(targetUsername)}".</div>
-        <button class="btn btn-primary mt-3" onclick="App.navigateTo('leaderboard')">Back to Ranks</button>
+        <button class="btn btn-primary mt-3" data-action="open-leaderboard">Back to Ranks</button>
       `;
     }
   },
@@ -216,7 +216,7 @@ const ProfilePage = {
               </div>
               <div class="form-group" style="max-width:360px;">
                 <label for="user-timezone" style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">Timezone</label>
-                <select id="user-timezone" name="timezone_id" class="form-input" onchange="saveUserTimezone(this.value)"></select>
+                <select id="user-timezone" name="timezone_id" class="form-input"></select>
               </div>
             </div>
           ` : ''}
@@ -232,6 +232,14 @@ const ProfilePage = {
     // Populate timezone selector in profile settings
     if (isSelf && typeof populateTimezoneSelect === 'function') {
       populateTimezoneSelect('user-timezone', user.timezone_id);
+      const tzSelect = document.getElementById('user-timezone');
+      if (tzSelect) {
+        tzSelect.addEventListener('change', (e) => {
+          if (typeof saveUserTimezone === 'function') {
+            saveUserTimezone(e.target.value);
+          }
+        });
+      }
     }
 
     // Filter pill listeners

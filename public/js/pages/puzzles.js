@@ -165,55 +165,6 @@ const PuzzlesPage = {
     }
   },
 
-      this.currentPuzzle = data;
-      document.getElementById('puzzle-rating').textContent = `${data.rating} Rating`;
-
-      // Render theme badges
-      const themeContainer = document.getElementById('puzzle-themes');
-      if (themeContainer) {
-        const tags = (data.themes || 'tactics').split(' ').map(t => `<span class="puzzle-theme-tag">${t}</span>`).join('');
-        themeContainer.innerHTML = tags;
-      }
-
-      // Fetch the full solution moves
-      const sol = await Api.get(`/puzzles/${data.puzzle_id}/solution`);
-      this.solutionMoves = sol.moves.split(' ');
-      this.currentMoveIndex = 0;
-
-      // Determine orientation: if initial FEN is black's turn, opponent is white, user is black (or vice versa)
-      const turn = data.fen.split(' ')[1];
-      const opponentIsWhite = turn === 'w';
-      const userColor = opponentIsWhite ? 'black' : 'white';
-
-      // Initialize the board with initial FEN
-      ChessBoard.init('board-container', {
-        orientation: userColor,
-        fen: data.fen,
-        interactive: false
-      });
-
-      // Update turn indicator
-      document.getElementById('puzzle-turn-indicator').textContent = 'Opponent is making their move...';
-
-      // Play opponent's setup move after 600ms
-      setTimeout(() => {
-        this.playOpponentMove(this.solutionMoves[0]);
-        this.currentMoveIndex = 1;
-
-        // Now board becomes interactive for user
-        ChessBoard.interactive = true;
-        ChessBoard.onMove = (move) => this.handleUserMove(move);
-        ChessBoard.render();
-        ChessBoard.bindEvents();
-
-        document.getElementById('puzzle-turn-indicator').textContent = `Find the best move for ${userColor}!`;
-      }, 600);
-
-    } catch (err) {
-      console.error('[Puzzles] Error loading puzzle:', err);
-    }
-  },
-
   playOpponentMove(uciMove) {
     if (!uciMove) return;
     const from = uciMove.substring(0, 2);

@@ -54,7 +54,7 @@ const LeaderboardPage = {
         const avatarSvg = AppConfig.getAvatarHTML(p.avatar_id || 1);
 
         rows += `
-          <tr style="cursor:pointer;" onclick="App.navigateTo('profile', '${p.username}')" title="View ${p.username}'s Profile">
+          <tr style="cursor:pointer;" data-action="open-profile" data-profile="${p.username}" title="View ${p.username}'s Profile">
             <td class="leaderboard-rank ${rankClass}">#${rank}</td>
             <td>
               <div class="leaderboard-player">

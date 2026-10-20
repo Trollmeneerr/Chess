@@ -110,7 +110,7 @@ const PlayPage = {
             ${isLoggedIn ? `
               <button class="btn btn-primary btn-block btn-lg" id="btn-create-match">Create Invite Link</button>
             ` : `
-              <button class="btn btn-primary btn-block btn-lg" onclick="Auth.showLoginModal()">Sign in to Play</button>
+              <button class="btn btn-primary btn-block btn-lg" data-action="show-login">Sign in to Play</button>
             `}
           </div>
 
@@ -184,7 +184,7 @@ const PlayPage = {
           <div style="font-size:32px;margin-bottom:8px;">🔗</div>
           <h3 style="font-size:16px;margin-bottom:4px;">Match Created!</h3>
           <p class="text-muted" style="font-size:13px;">Send this link to your friend:</p>
-          <input type="text" class="invite-url" id="invite-url-input" value="${shareUrl}" readonly onclick="this.select()">
+          <input type="text" class="invite-url" id="invite-url-input" value="${shareUrl}" readonly>
           <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;">
             <button class="btn btn-primary btn-sm" id="btn-copy-link">Copy Link</button>
             <button class="btn btn-ghost btn-sm" id="btn-enter-room">Join Room Now</button>
@@ -192,6 +192,10 @@ const PlayPage = {
           <div class="waiting-text mt-2">Waiting for opponent to connect...</div>
         </div>
       `;
+
+      document.getElementById('invite-url-input')?.addEventListener('click', function() {
+        this.select();
+      });
 
       document.getElementById('btn-copy-link')?.addEventListener('click', () => {
         const input = document.getElementById('invite-url-input');
@@ -304,14 +308,14 @@ const PlayPage = {
                 </div>
               </div>
 
-              <a href="/analysis" data-action="game-review" onclick="if(typeof switchMode==='function')switchMode('analysis')" class="btn-primary review-cta">
+              <a href="/analysis" data-action="game-review" class="btn-primary review-cta">
                 <strong>Game Review</strong>
                 <span>See top 3 lines & best blue moves</span>
               </a>
 
               <div class="post-game-actions">
-                <button data-action="play-online" onclick="startNewGame()" class="btn-secondary">New Game</button>
-                <button onclick="requestRematch()" class="btn-secondary">Rematch</button>
+                <button data-action="play-online" class="btn-secondary">New Game</button>
+                <button data-action="request-rematch" class="btn-secondary">Rematch</button>
               </div>
             </section>
 
@@ -628,6 +632,12 @@ const PlayPage = {
       onGameEnd(title, data.reason ? `by ${data.reason}` : (data.result ? `Game Result: ${data.result}` : 'Game Concluded'), wAcc, bAcc);
     }
 
+    window.lastFinishedGame = {
+      pgn: data.pgn,
+      inviteCode: this.currentGame?.invite_code || inviteCode,
+      user_color: userIsWhite ? 'white' : 'black'
+    };
+
     const boardWrap = document.querySelector('.board-wrapper');
     if (boardWrap) {
       const overlay = document.createElement('div');
@@ -640,7 +650,7 @@ const PlayPage = {
           ${eloHtml}
           <div class="game-over-actions">
             <button class="btn btn-primary" id="btn-review-game">Game Review</button>
-            <button class="btn btn-ghost" onclick="App.navigateTo('play')">New Match</button>
+            <button class="btn btn-ghost" data-action="play-online">New Match</button>
           </div>
         </div>
       `;

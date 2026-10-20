@@ -169,7 +169,7 @@ router.post('/store', optionalAuth, async (req, res) => {
 router.post('/game', optionalAuth, async (req, res) => {
   try {
     let { pgn, invite_code, game_id, force, depth } = req.body;
-    const reqDepth = depth ? parseInt(depth) : undefined;
+    const reqDepth = depth ? parseInt(depth) : 8;
 
     let game = null;
     if (invite_code) {
@@ -241,7 +241,7 @@ router.post('/game', optionalAuth, async (req, res) => {
       try {
         // Get evaluation before the move
         const evalResult = isStockfish
-          ? await stockfish.evaluate(fen, reqDepth, 800)
+          ? await stockfish.evaluate(fen, reqDepth, 150)
           : { score: calcMaterial(evalChess), bestmove: null };
         const currentEval = evalResult.score;
 

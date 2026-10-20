@@ -400,12 +400,35 @@ document.addEventListener('click', (e) => {
 
   const action = btn.dataset.action;
   const routes = {
-    'play-online':   () => (window.App ? window.App.navigateTo('play') : window.location.assign('/play')),
-    'play-bots':     () => (window.App ? window.App.navigateTo('bots') : window.location.assign('/bots')),
-    'game-review':   () => (typeof switchMode === 'function' ? switchMode('analysis') : (window.App ? window.App.navigateTo('analysis') : window.location.assign('/analysis'))),
-    'open-puzzles':  () => (window.App ? window.App.navigateTo('puzzles') : window.location.assign('/puzzles')),
-    'open-profile':  () => (window.App ? window.App.navigateTo('profile') : window.location.assign('/profile')),
-    'puzzle-hint':   () => requestPuzzleHint()
+    'play-online':        () => (window.App ? window.App.navigateTo('play') : window.location.assign('/play')),
+    'play-bots':          () => (window.App ? window.App.navigateTo('bots') : window.location.assign('/bots')),
+    'game-review':        () => {
+      if (window.lastFinishedGame && (window.lastFinishedGame.pgn || window.lastFinishedGame.inviteCode)) {
+        if (window.App) window.App.navigateTo('analysis', window.lastFinishedGame);
+        else window.location.assign('/analysis');
+      } else {
+        if (typeof switchMode === 'function') switchMode('analysis');
+        else if (window.App) window.App.navigateTo('analysis');
+        else window.location.assign('/analysis');
+      }
+    },
+    'open-puzzles':       () => (window.App ? window.App.navigateTo('puzzles') : window.location.assign('/puzzles')),
+    'open-profile':       () => (window.App ? window.App.navigateTo('profile', btn.dataset.profile || undefined) : window.location.assign('/profile')),
+    'open-leaderboard':   () => (window.App ? window.App.navigateTo('leaderboard') : window.location.assign('/leaderboard')),
+    'puzzle-hint':        () => requestPuzzleHint(),
+    'request-rematch':    () => (typeof requestRematch === 'function' ? requestRematch() : null),
+    'show-login':         () => (window.Auth && typeof window.Auth.showLoginModal === 'function' && window.Auth.showLoginModal()),
+    'show-register':      () => (window.Auth && typeof window.Auth.showRegisterModal === 'function' && window.Auth.showRegisterModal()),
+    'close-forgot-modal': () => {
+      const modal = document.getElementById('forgot-modal');
+      if (modal) modal.classList.add('hidden');
+    },
+    'switch-tab': () => {
+      const tab = btn.dataset.tab;
+      if (tab && window.AnalysisPage && typeof window.AnalysisPage.switchTab === 'function') {
+        window.AnalysisPage.switchTab(tab);
+      }
+    }
   };
 
   if (routes[action]) {
