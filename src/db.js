@@ -349,18 +349,23 @@ async function runMigrations() {
 
 async function seedStarterPuzzles() {
   try {
-    const existing = await get('SELECT COUNT(*) as count FROM puzzles');
-    if (existing && existing.count > 0) return;
-
     const { STARTER_PUZZLES } = require('./engine/starter-puzzles');
-    console.log(`[DB] Seeding ${STARTER_PUZZLES.length} starter puzzles...`);
+    const existing = await get('SELECT COUNT(*) as count FROM puzzles');
+    if (existing && existing.count >= STARTER_PUZZLES.length) return;
+
+    if (existing && existing.count > 0) {
+      console.log(`[DB] Upgrading existing puzzles (${existing.count}) to verified multi-move dataset (${STARTER_PUZZLES.length})...`);
+      await run('DELETE FROM puzzles');
+    }
+
+    console.log(`[DB] Seeding ${STARTER_PUZZLES.length} verified multi-move starter puzzles...`);
     for (const p of STARTER_PUZZLES) {
       await insert(
-        'INSERT INTO puzzles (puzzle_id, fen, moves, rating, themes) VALUES (?, ?, ?, ?, ?)',
-        [p.puzzle_id, p.fen, p.moves, p.rating, p.themes]
+        'INSERT INTO puzzles (puzzle_id, fen, moves, rating, themes, popularity) VALUES (?, ?, ?, ?, ?, ?)',
+        [p.puzzle_id, p.fen, p.moves, p.rating, p.themes, p.popularity || 0]
       );
     }
-    console.log('[DB] Starter puzzles seeded successfully');
+    console.log('[DB] Verified multi-move starter puzzles seeded successfully');
   } catch (err) {
     console.error('[DB] Failed to seed starter puzzles:', err.message);
   }

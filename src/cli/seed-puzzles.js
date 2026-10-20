@@ -35,10 +35,15 @@ async function main() {
       if (parts.length >= 8) {
         const puzzleId = parts[0];
         const fen = parts[1];
-        const moves = parts[2];
+        const moves = parts[2] ? parts[2].trim() : '';
         const rating = parseInt(parts[3]) || 1200;
         const themes = parts[7] || '';
         const popularity = parseInt(parts[5]) || 0;
+
+        // Strict multi-move filter: moves.split(' ').length >= 6 (at least 3 player moves + 3 opponent moves)
+        if (!moves || moves.split(/\s+/).length < 6) {
+          continue;
+        }
 
         try {
           await db.insert(

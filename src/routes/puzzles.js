@@ -91,6 +91,19 @@ router.get('/:puzzleId/solution', optionalAuth, async (req, res) => {
   }
 });
 
+// GET /api/puzzles/verified — Get verified multi-move puzzles list
+router.get('/verified', optionalAuth, async (req, res) => {
+  try {
+    const puzzles = await db.all('SELECT puzzle_id as id, fen, moves, rating, themes, popularity FROM puzzles ORDER BY rating ASC');
+    res.json(puzzles.map(p => ({
+      ...p,
+      moves: p.moves.trim().split(/\s+/)
+    })));
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch verified puzzles' });
+  }
+});
+
 // POST /api/puzzles/:puzzleId/attempt — Submit a puzzle attempt
 router.post('/:puzzleId/attempt', authMiddleware, async (req, res) => {
   try {

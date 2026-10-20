@@ -496,9 +496,12 @@ function handleStockfishWorkerMessage(line) {
     // Update UI badge and line moves
     updateEngineLineUI(pvIndex, scoreText, pvString);
 
-    // If top line (multipv 1), update evaluation bar!
+    // If top line (multipv 1), update evaluation bar and puzzle post-continuation preview!
     if (pvIndex === 1) {
       updateEvaluationBar(scoreType === 'cp' ? scoreVal : 0, scoreType === 'mate' ? scoreVal : null);
+      if (typeof window.renderPostPuzzle5MoveIdea === 'function' && window.puzzleController && window.puzzleController.isCompleted) {
+        window.renderPostPuzzle5MoveIdea(pvMovesMatch[1].trim());
+      }
     }
   }
 }
@@ -558,6 +561,9 @@ async function fetchBackendMultiPV(fen) {
 
         if (l.pvNum === 1) {
           updateEvaluationBar(scoreType === 'cp' ? Math.round(l.score * 100) : 0, scoreType === 'mate' ? l.score : null);
+          if (typeof window.renderPostPuzzle5MoveIdea === 'function' && window.puzzleController && window.puzzleController.isCompleted) {
+            window.renderPostPuzzle5MoveIdea(Array.isArray(l.pv) ? l.pv.join(' ') : (l.pv || ''));
+          }
         }
       });
     }

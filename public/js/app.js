@@ -48,9 +48,10 @@ const App = {
       !window.BotsPage.isGameOver;
 
     const isPuzzleActive = this.currentPage === 'puzzles' &&
-      Boolean(window.puzzleState?.currentPuzzle || window.PuzzlesPage?.currentPuzzle) &&
+      Boolean(window.puzzleState?.currentPuzzle || window.PuzzlesPage?.currentPuzzle || window.puzzleController?.puzzle) &&
       !window.puzzleState?.isFinished &&
-      !window.PuzzlesPage?.isFinished;
+      !window.PuzzlesPage?.isFinished &&
+      !window.puzzleController?.isCompleted;
 
     return Boolean(isPvpActive || isBotActive || isPuzzleActive);
   },
@@ -118,9 +119,10 @@ const App = {
 
     // 3. Check Tactical Puzzle
     const isPuzzleActive = this.currentPage === 'puzzles' &&
-      Boolean(window.puzzleState?.currentPuzzle || window.PuzzlesPage?.currentPuzzle) &&
+      Boolean(window.puzzleState?.currentPuzzle || window.PuzzlesPage?.currentPuzzle || window.puzzleController?.puzzle) &&
       !window.puzzleState?.isFinished &&
-      !window.PuzzlesPage?.isFinished;
+      !window.PuzzlesPage?.isFinished &&
+      !window.puzzleController?.isCompleted;
 
     if (isPuzzleActive) {
       const ok = window.confirm(
@@ -130,8 +132,9 @@ const App = {
 
       if (window.puzzleState) window.puzzleState.isFinished = true;
       if (window.PuzzlesPage) window.PuzzlesPage.isFinished = true;
+      if (window.puzzleController) window.puzzleController.isCompleted = true;
 
-      const puzzle = window.puzzleState?.currentPuzzle || window.PuzzlesPage?.currentPuzzle;
+      const puzzle = window.puzzleState?.currentPuzzle || window.PuzzlesPage?.currentPuzzle || window.puzzleController?.puzzle;
       if (window.Auth && window.Auth.currentUser && window.Api && puzzle) {
         const puzzleId = puzzle.id || puzzle.puzzle_id;
         window.Api.post(`/puzzles/${puzzleId}/attempt`, {

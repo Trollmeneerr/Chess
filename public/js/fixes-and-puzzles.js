@@ -426,7 +426,7 @@ document.addEventListener('click', (e) => {
     'open-puzzles':       () => (window.App ? window.App.navigateTo('puzzles') : window.location.assign('/puzzles')),
     'open-profile':       () => (window.App ? window.App.navigateTo('profile', btn.dataset.profile || undefined) : window.location.assign('/profile')),
     'open-leaderboard':   () => (window.App ? window.App.navigateTo('leaderboard') : window.location.assign('/leaderboard')),
-    'puzzle-hint':        () => requestPuzzleHint(),
+    'puzzle-hint':        () => (typeof triggerPuzzleHint === 'function' ? triggerPuzzleHint() : requestPuzzleHint()),
     'request-rematch':    () => (typeof requestRematch === 'function' ? requestRematch() : null),
     'show-login':         () => (window.Auth && typeof window.Auth.showLoginModal === 'function' && window.Auth.showLoginModal()),
     'show-register':      () => (window.Auth && typeof window.Auth.showRegisterModal === 'function' && window.Auth.showRegisterModal()),

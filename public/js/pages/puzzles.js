@@ -56,6 +56,16 @@ const PuzzlesPage = {
               <button data-action="puzzle-hint" class="btn-blue-sm" id="btn-puzzle-hint">Hint</button>
             </div>
 
+            <!-- Stockfish 5-Move Continuation Idea Panel (When Solved) -->
+            <div class="glass-panel hidden puzzle-continuation-panel" id="puzzle-continuation-box">
+              <div class="continuation-header">
+                <span class="badge badge-accent">STOCKFISH 16.1</span>
+                <span class="continuation-title">Post-Puzzle Follow-Up (5 Moves Ahead)</span>
+              </div>
+              <div id="puzzle-5move-line" class="continuation-line">Analyzing strategic continuation...</div>
+              <div class="continuation-subtext">Blue arrow shows the immediate engine follow-up idea (#3b82f6). Free board exploration is unlocked!</div>
+            </div>
+
             <div class="glass-panel difficulty-selector mb-2">
               <h4>Difficulty</h4>
               <div class="difficulty-options">
@@ -110,47 +120,57 @@ const PuzzlesPage = {
     const feedback = document.getElementById('puzzle-feedback');
     if (feedback) feedback.classList.add('hidden');
 
+    const contBox = document.getElementById('puzzle-continuation-box');
+    if (contBox) contBox.classList.add('hidden');
+
     if (typeof resetBoardVisualState === 'function') {
       resetBoardVisualState();
     }
 
     this.isFinished = false;
+    if (window.puzzleController) {
+      window.puzzleController.isCompleted = false;
+    }
     if (window.puzzleState) {
       window.puzzleState.isFinished = false;
     }
 
-    // Filter verified puzzles by difficulty bracket if possible
-    const allVerified = (window.VERIFIED_PUZZLES && window.VERIFIED_PUZZLES.length > 0)
-      ? window.VERIFIED_PUZZLES
-      : [];
-    
+    // Filter verified multi-move puzzles by difficulty bracket
+    const allVerified = (window.VERIFIED_MULTI_MOVE_PUZZLES && window.VERIFIED_MULTI_MOVE_PUZZLES.length > 0)
+      ? window.VERIFIED_MULTI_MOVE_PUZZLES
+      : ((window.VERIFIED_PUZZLES && window.VERIFIED_PUZZLES.length > 0) ? window.VERIFIED_PUZZLES : []);
+
     let pool = allVerified;
-    if (this.currentDifficulty === 'easy') pool = allVerified.filter(p => p.rating < 900);
-    else if (this.currentDifficulty === 'medium') pool = allVerified.filter(p => p.rating >= 900 && p.rating < 1400);
+    if (this.currentDifficulty === 'easy') pool = allVerified.filter(p => p.rating < 1000);
+    else if (this.currentDifficulty === 'medium') pool = allVerified.filter(p => p.rating >= 1000 && p.rating < 1400);
     else if (this.currentDifficulty === 'hard') pool = allVerified.filter(p => p.rating >= 1400 && p.rating < 1900);
     else if (this.currentDifficulty === 'master') pool = allVerified.filter(p => p.rating >= 1900);
+    else if (this.currentDifficulty === 'adaptive') {
+      const userRating = (window.Auth && window.Auth.currentUser?.elo_rating) || 800;
+      pool = allVerified.filter(p => p.rating >= userRating - 150 && p.rating <= userRating + 150);
+      if (pool.length === 0) pool = allVerified;
+    }
 
     if (pool.length === 0) pool = allVerified;
+
+    if (typeof startSeededMultiMovePuzzle === 'function' && pool.length > 0) {
+      startSeededMultiMovePuzzle(pool, seed);
+      this.currentPuzzle = window.puzzleController?.puzzle;
+      return;
+    }
 
     if (typeof loadSeededPuzzle === 'function' && pool.length > 0) {
       loadSeededPuzzle(pool, seed);
       this.currentPuzzle = window.puzzleState?.currentPuzzle;
-      if (this.currentPuzzle) {
-        const ratingEl = document.getElementById('puzzle-rating');
-        if (ratingEl) ratingEl.textContent = `${this.currentPuzzle.rating} Rating`;
-        const themeContainer = document.getElementById('puzzle-themes');
-        if (themeContainer) {
-          const tags = (this.currentPuzzle.themes || 'tactics').split(' ').map(t => `<span class="puzzle-theme-tag">${t}</span>`).join('');
-          themeContainer.innerHTML = tags;
-        }
-      }
       return;
     }
 
     try {
-      const data = await Api.get(`/puzzles/random?difficulty=${this.currentDifficulty}`);
+      const data = await Api.get(`/puzzles/random?difficulty=${this.currentDifficulty}&multi_move=true`);
       if (!data || !data.puzzle_id) {
-        alert('No puzzles found in this difficulty bracket.');
+        if (allVerified.length > 0 && typeof startSeededMultiMovePuzzle === 'function') {
+          startSeededMultiMovePuzzle(allVerified, seed);
+        }
         return;
       }
       const sol = await Api.get(`/puzzles/${data.puzzle_id}/solution`);
@@ -162,21 +182,18 @@ const PuzzlesPage = {
         rating: data.rating,
         themes: data.themes
       };
-      if (typeof loadSeededPuzzle === 'function') {
+      if (typeof startSeededMultiMovePuzzle === 'function') {
+        startSeededMultiMovePuzzle([puzzleObj], seed);
+        this.currentPuzzle = puzzleObj;
+      } else if (typeof loadSeededPuzzle === 'function') {
         loadSeededPuzzle([puzzleObj], seed);
-        this.currentPuzzle = window.puzzleState?.currentPuzzle;
-        if (this.currentPuzzle) {
-          const ratingEl = document.getElementById('puzzle-rating');
-          if (ratingEl) ratingEl.textContent = `${this.currentPuzzle.rating} Rating`;
-          const themeContainer = document.getElementById('puzzle-themes');
-          if (themeContainer) {
-            const tags = (this.currentPuzzle.themes || 'tactics').split(' ').map(t => `<span class="puzzle-theme-tag">${t}</span>`).join('');
-            themeContainer.innerHTML = tags;
-          }
-        }
+        this.currentPuzzle = puzzleObj;
       }
     } catch (err) {
       console.error('[Puzzles] Error loading puzzle:', err);
+      if (allVerified.length > 0 && typeof startSeededMultiMovePuzzle === 'function') {
+        startSeededMultiMovePuzzle(allVerified, seed);
+      }
     }
   },
 
@@ -309,6 +326,10 @@ const PuzzlesPage = {
 
   revealHint() {
     this.usedSolution = true;
+    if (typeof triggerPuzzleHint === 'function') {
+      triggerPuzzleHint();
+      return;
+    }
     if (typeof requestPuzzleHint === 'function') {
       requestPuzzleHint();
       return;
