@@ -323,7 +323,7 @@ function getMultiPV(fen, moves = '', numPV = 5, depth = 5, movetime = 800) {
 /**
  * Evaluate a position for analysis (returns eval + best line)
  */
-function evaluate(fen, depth = MAX_DEPTH, movetime = 1500) {
+function evaluate(fen, depth = MAX_DEPTH, movetime = 800) {
   return new Promise((resolve, reject) => {
     if (!stockfishProcess || !isReady) {
       return reject(new Error('Stockfish not available'));
@@ -336,6 +336,12 @@ function evaluate(fen, depth = MAX_DEPTH, movetime = 1500) {
     const positionCmd = `position fen ${fen}`;
     const goCmd = `go depth ${clampedDepth} movetime ${movetime}`;
 
+    const timeout = setTimeout(() => {
+      if (currentRequest && currentRequest.id === req.id) {
+        sendCommand('stop');
+      }
+    }, movetime + 500);
+
     const req = {
       id: Date.now() + Math.random(),
       type: 'eval',
@@ -343,6 +349,7 @@ function evaluate(fen, depth = MAX_DEPTH, movetime = 1500) {
       goCmd,
       infoLines: [],
       resolve: (result) => {
+        clearTimeout(timeout);
         // Parse the deepest info line for score
         let score = null;
         let scoreType = 'cp';
@@ -354,15 +361,41 @@ function evaluate(fen, depth = MAX_DEPTH, movetime = 1500) {
             break;
           }
         }
+
+        // In Stockfish UCI, score is from side to move's perspective.
+        // Standard chess evaluation is normalized: positive = White winning, negative = Black winning.
+        const turn = fen ? fen.split(' ')[1] : 'w';
+        let normalizedScore = 0;
+        let mateMoves = null;
+
+        if (scoreType === 'mate') {
+          mateMoves = score; // positive means side to move can deliver mate in N
+          normalizedScore = score > 0 ? (100 - score) : (-100 - score);
+          if (turn === 'b') {
+            normalizedScore = -normalizedScore;
+            mateMoves = -mateMoves;
+          }
+        } else {
+          normalizedScore = score !== null ? score / 100 : 0;
+          if (turn === 'b') {
+            normalizedScore = -normalizedScore;
+          }
+        }
+
         resolve({
           bestmove: result.bestmove,
-          score: scoreType === 'cp' ? score / 100 : (score > 0 ? 999 + score : -999 + score),
+          score: normalizedScore,
           scoreType,
+          mate: mateMoves,
           scoreRaw: score,
+          turn,
           raw: result.evaluations
         });
       },
-      reject
+      reject: (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      }
     };
 
     requestQueue.push(req);

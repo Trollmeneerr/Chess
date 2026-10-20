@@ -34,6 +34,7 @@ const ChessBoard = {
     this.orientation = options.orientation || 'white';
     this.interactive = options.interactive !== false;
     this.allowPremove = options.allowPremove !== false;
+    this.showToolbar = options.showToolbar !== false;
     this.onMove = options.onMove || null;
     this.fen = options.fen || AppConfig.INITIAL_FEN;
     this.premove = null;
@@ -42,6 +43,73 @@ const ChessBoard = {
     this.render();
     this.bindEvents();
     this.setupResizeObserver();
+    this.applySavedBoardSize();
+  },
+
+  /**
+   * Get preferred board size from localStorage or viewport
+   */
+  getBoardSize() {
+    const saved = localStorage.getItem('chess_board_size');
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (!isNaN(parsed) && parsed >= 320 && parsed <= 960) return parsed;
+    }
+    const maxViewport = Math.min(window.innerWidth - 380, window.innerHeight * 0.76);
+    return Math.max(340, Math.min(680, Math.round(maxViewport)));
+  },
+
+  /**
+   * Set board size dynamically and persist to localStorage
+   */
+  setBoardSize(size) {
+    const minSize = 320;
+    const maxAvailable = Math.min(960, window.innerWidth - 32, window.innerHeight * 0.88);
+    const clamped = Math.round(Math.max(minSize, Math.min(maxAvailable, size)));
+
+    localStorage.setItem('chess_board_size', clamped);
+
+    const boardEl = this.boardEl || document.getElementById('chess-board-grid');
+    if (boardEl) {
+      boardEl.style.setProperty('--board-custom-size', `${clamped}px`);
+      boardEl.style.width = `${clamped}px`;
+      boardEl.style.height = `${clamped}px`;
+    }
+
+    const slider = document.getElementById('board-scale-slider');
+    if (slider) slider.value = clamped;
+
+    this.updateSquareSize();
+  },
+
+  applySavedBoardSize() {
+    const size = this.getBoardSize();
+    const boardEl = this.boardEl || document.getElementById('chess-board-grid');
+    if (boardEl && size) {
+      boardEl.style.setProperty('--board-custom-size', `${size}px`);
+      boardEl.style.width = `${size}px`;
+      boardEl.style.height = `${size}px`;
+    }
+    const slider = document.getElementById('board-scale-slider');
+    if (slider && size) slider.value = size;
+  },
+
+  getScaleToolbarHTML() {
+    const currentSize = this.getBoardSize();
+    return `
+      <div class="board-controls-toolbar" id="board-controls-toolbar">
+        <div class="board-scale-slider-wrap">
+          <label>Board</label>
+          <input type="range" class="board-scale-slider" id="board-scale-slider" min="340" max="860" step="10" value="${currentSize}" title="Scale Board Size">
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button type="button" class="btn btn-outline btn-sm" id="btn-scale-preset-sm" style="padding:4px 8px;font-size:11px;">Small</button>
+          <button type="button" class="btn btn-outline btn-sm" id="btn-scale-preset-md" style="padding:4px 8px;font-size:11px;">Medium</button>
+          <button type="button" class="btn btn-outline btn-sm" id="btn-scale-preset-lg" style="padding:4px 8px;font-size:11px;">Large</button>
+          <button type="button" class="btn btn-outline btn-sm" id="btn-board-flip-tb" title="Flip Board" style="padding:4px 8px;font-size:12px;">⇄ Flip</button>
+        </div>
+      </div>
+    `;
   },
 
   /**
@@ -68,7 +136,7 @@ const ChessBoard = {
     if (!container) return;
 
     const board = this.parseFEN(this.fen);
-    let html = '<div class="chess-board size-lg" id="chess-board-grid">';
+    let html = '<div class="chess-board" id="chess-board-grid">';
 
     const ranks = this.orientation === 'white'
       ? [7, 6, 5, 4, 3, 2, 1, 0]
@@ -113,7 +181,17 @@ const ChessBoard = {
           classes += ` highlight-${this.highlightedSquares.get(sq)}`;
         }
 
+        // In-square coordinates (Chess.com style)
+        let coordHTML = '';
+        if (file === files[0]) {
+          coordHTML += `<span class="coord-in-square coord-rank">${AppConfig.RANKS[7 - rank]}</span>`;
+        }
+        if (rank === ranks[7]) {
+          coordHTML += `<span class="coord-in-square coord-file">${AppConfig.FILES[file]}</span>`;
+        }
+
         html += `<div class="${classes}" data-square="${sq}" data-rank="${rank}" data-file="${file}">`;
+        html += coordHTML;
         if (piece) {
           html += `<span class="piece" data-piece="${piece}">${AppConfig.getPiece(piece)}</span>`;
         }
@@ -137,22 +215,23 @@ const ChessBoard = {
       </svg>
     `;
 
-    html += '</div>';
+    html += '</div>'; // End chess-board
 
-    // Board coordinates
-    html += '<div class="board-coords-rank">';
-    for (const rank of ranks) {
-      html += `<span class="coord-label">${AppConfig.RANKS[7 - rank]}</span>`;
-    }
-    html += '</div>';
-    html += '<div class="board-coords-file">';
-    for (const file of files) {
-      html += `<span class="coord-label">${AppConfig.FILES[file]}</span>`;
-    }
-    html += '</div>';
+    // Outer wrapper with corner resize handle and toolbar
+    const toolbarHTML = this.showToolbar ? this.getScaleToolbarHTML() : '';
+    const outerHTML = `
+      <div class="chess-board-outer" id="chess-board-outer">
+        ${html}
+        <div class="board-resize-handle" id="board-resize-handle" title="Drag corner to scale board">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 14 20 20 14 20"></polyline><line x1="20" y1="20" x2="13" y2="13"></line></svg>
+        </div>
+      </div>
+      ${toolbarHTML}
+    `;
 
-    container.innerHTML = html;
+    container.innerHTML = outerHTML;
     this.boardEl = document.getElementById('chess-board-grid');
+    this.applySavedBoardSize();
     this.renderArrows();
     this.updateSquareSize();
   },
@@ -312,6 +391,75 @@ const ChessBoard = {
       sq.addEventListener('mousedown', (e) => this.handleMouseDown(e, sq));
       sq.addEventListener('click', (e) => this.handleClick(e, sq));
     });
+
+    // Board corner drag resize handle
+    const handle = document.getElementById('board-resize-handle');
+    if (handle && !handle._resizeBound) {
+      handle._resizeBound = true;
+      const onResizeStart = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const startX = e.clientX || (e.touches && e.touches[0]?.clientX);
+        const startWidth = this.boardEl ? this.boardEl.clientWidth : this.getBoardSize();
+        handle.classList.add('active');
+
+        const onResizeMove = (moveEv) => {
+          const clientX = moveEv.clientX || (moveEv.touches && moveEv.touches[0]?.clientX);
+          if (clientX === undefined) return;
+          const delta = (clientX - startX) * 1.5;
+          this.setBoardSize(startWidth + delta);
+        };
+
+        const onResizeEnd = () => {
+          handle.classList.remove('active');
+          document.removeEventListener('mousemove', onResizeMove);
+          document.removeEventListener('mouseup', onResizeEnd);
+          document.removeEventListener('touchmove', onResizeMove);
+          document.removeEventListener('touchend', onResizeEnd);
+        };
+
+        document.addEventListener('mousemove', onResizeMove);
+        document.addEventListener('mouseup', onResizeEnd);
+        document.addEventListener('touchmove', onResizeMove);
+        document.addEventListener('touchend', onResizeEnd);
+      };
+
+      handle.addEventListener('mousedown', onResizeStart);
+      handle.addEventListener('touchstart', onResizeStart, { passive: false });
+    }
+
+    // Board scale slider and presets
+    const slider = document.getElementById('board-scale-slider');
+    if (slider && !slider._sliderBound) {
+      slider._sliderBound = true;
+      slider.addEventListener('input', (e) => {
+        this.setBoardSize(parseInt(e.target.value, 10));
+      });
+    }
+
+    const smBtn = document.getElementById('btn-scale-preset-sm');
+    if (smBtn && !smBtn._bound) {
+      smBtn._bound = true;
+      smBtn.addEventListener('click', () => this.setBoardSize(440));
+    }
+
+    const mdBtn = document.getElementById('btn-scale-preset-md');
+    if (mdBtn && !mdBtn._bound) {
+      mdBtn._bound = true;
+      mdBtn.addEventListener('click', () => this.setBoardSize(620));
+    }
+
+    const lgBtn = document.getElementById('btn-scale-preset-lg');
+    if (lgBtn && !lgBtn._bound) {
+      lgBtn._bound = true;
+      lgBtn.addEventListener('click', () => this.setBoardSize(780));
+    }
+
+    const flipTbBtn = document.getElementById('btn-board-flip-tb');
+    if (flipTbBtn && !flipTbBtn._bound) {
+      flipTbBtn._bound = true;
+      flipTbBtn.addEventListener('click', () => this.flip());
+    }
 
     // Prevent context menu anywhere on board grid
     this.boardEl.addEventListener('contextmenu', (e) => {
@@ -479,15 +627,14 @@ const ChessBoard = {
     if (!this.dragging.hasMoved && (dx > 5 || dy > 5)) {
       this.dragging.hasMoved = true;
       // Create floating piece
-      this.dragPieceEl = document.createElement('span');
+      this.dragPieceEl = document.createElement('div');
       this.dragPieceEl.className = 'piece dragging';
       this.dragPieceEl.setAttribute('data-piece', this.dragging.piece);
-      this.dragPieceEl.textContent = AppConfig.getPiece(this.dragging.piece);
+      this.dragPieceEl.innerHTML = AppConfig.getPiece(this.dragging.piece);
 
       const sqSize = this.squareSize || (this.boardEl ? this.boardEl.clientWidth / 8 : 72);
       this.dragPieceEl.style.width = sqSize + 'px';
       this.dragPieceEl.style.height = sqSize + 'px';
-      this.dragPieceEl.style.fontSize = sqSize + 'px';
 
       document.body.appendChild(this.dragPieceEl);
 
@@ -499,9 +646,8 @@ const ChessBoard = {
     }
 
     if (this.dragPieceEl) {
-      const halfSq = (this.squareSize || 72) / 2;
-      this.dragPieceEl.style.left = (e.clientX - halfSq) + 'px';
-      this.dragPieceEl.style.top = (e.clientY - halfSq) + 'px';
+      this.dragPieceEl.style.left = e.clientX + 'px';
+      this.dragPieceEl.style.top = e.clientY + 'px';
     }
   },
 
@@ -840,5 +986,39 @@ const ChessBoard = {
     const materialDiff = calcValue(whiteCaptured) - calcValue(blackCaptured);
 
     return { whiteCaptured, blackCaptured, materialDiff };
+  },
+
+  /**
+   * Render captured pieces with mini SVG icons and count badges (Chess.com style)
+   */
+  renderCapturedHTML(capturedPieces, materialDiff = 0) {
+    if (!capturedPieces || capturedPieces.length === 0) {
+      if (materialDiff > 0) return `<span class="material-diff-badge">+${materialDiff}</span>`;
+      return '';
+    }
+
+    const order = { 'p': 1, 'n': 2, 'b': 3, 'r': 4, 'q': 5, 'k': 6 };
+    const counts = {};
+    for (const p of capturedPieces) {
+      counts[p] = (counts[p] || 0) + 1;
+    }
+
+    const sortedKeys = Object.keys(counts).sort((a, b) => (order[a.toLowerCase()] || 0) - (order[b.toLowerCase()] || 0));
+
+    let html = '<div class="captured-pieces">';
+    for (const pieceKey of sortedKeys) {
+      const count = counts[pieceKey];
+      html += `
+        <div class="captured-group" title="${pieceKey.toUpperCase()} x${count}">
+          <span class="captured-piece-svg">${AppConfig.getPiece(pieceKey)}</span>
+          ${count > 1 ? `<span class="captured-count">${count}</span>` : ''}
+        </div>
+      `;
+    }
+    if (materialDiff > 0) {
+      html += `<span class="material-diff-badge">+${materialDiff}</span>`;
+    }
+    html += '</div>';
+    return html;
   }
 };

@@ -94,9 +94,15 @@ const PlayPage = {
           <div class="form-group">
             <label class="form-label">Play As</label>
             <div class="color-select">
-              <button class="color-btn" data-color="white" title="White">♔</button>
-              <button class="color-btn active" data-color="random" title="Random">☯</button>
-              <button class="color-btn" data-color="black" title="Black">♚</button>
+              <button class="color-btn" data-color="white" title="White">
+                <span class="color-btn-svg" style="width:24px;height:24px;display:inline-block;">${AppConfig.getPiece('K')}</span>
+              </button>
+              <button class="color-btn active" data-color="random" title="Random">
+                <span style="font-size:20px;">☯</span>
+              </button>
+              <button class="color-btn" data-color="black" title="Black">
+                <span class="color-btn-svg" style="width:24px;height:24px;display:inline-block;">${AppConfig.getPiece('k')}</span>
+              </button>
             </div>
           </div>
 
@@ -231,8 +237,11 @@ const PlayPage = {
 
             <!-- Player bar -->
             <div class="player-bar mt-2" id="player-bar">
-              <div class="player-info-badge">
-                <span class="player-avatar" id="self-avatar">${Auth.currentUser ? AppConfig.AVATARS[(Auth.currentUser.avatar_id || 1) - 1] : '♔'}</span>
+                <div class="player-avatar-wrap">
+                  <span class="player-avatar-svg" id="self-avatar">
+                    ${Auth.currentUser ? AppConfig.getAvatarHTML(Auth.currentUser.avatar_id) : AppConfig.getPiece('K')}
+                  </span>
+                </div>
                 <div>
                   <div class="player-name" id="self-name">${Auth.currentUser ? Auth.currentUser.username : 'You'}</div>
                   <div class="player-rating" id="self-rating">${Auth.currentUser ? Auth.currentUser.elo_rating : ''}</div>
@@ -428,7 +437,8 @@ const PlayPage = {
     if (oppUser) {
       document.getElementById('opp-name').textContent = oppUser.username;
       document.getElementById('opp-rating').textContent = `${oppUser.elo_rating || 800} ELO`;
-      document.getElementById('opp-avatar').textContent = AppConfig.AVATARS[(oppUser.avatar_id || 1) - 1] || '👤';
+      const oppAvEl = document.getElementById('opp-avatar');
+      if (oppAvEl) oppAvEl.innerHTML = AppConfig.getAvatarHTML(oppUser.avatar_id || 7);
     } else {
       document.getElementById('opp-name').textContent = 'Waiting for opponent...';
     }
@@ -436,7 +446,8 @@ const PlayPage = {
     if (selfUser) {
       document.getElementById('self-name').textContent = selfUser.username;
       document.getElementById('self-rating').textContent = `${selfUser.elo_rating || 800} ELO`;
-      document.getElementById('self-avatar').textContent = AppConfig.AVATARS[(selfUser.avatar_id || 1) - 1] || '👤';
+      const selfAvEl = document.getElementById('self-avatar');
+      if (selfAvEl) selfAvEl.innerHTML = AppConfig.getAvatarHTML(selfUser.avatar_id || 1);
     }
   },
 
@@ -504,15 +515,15 @@ const PlayPage = {
     const selfCapturedEl = document.getElementById('self-captured');
     const oppCapturedEl = document.getElementById('opp-captured');
 
-    const renderPieces = (pieces, diff) => {
-      let str = pieces.map(p => AppConfig.PIECE_UNICODE[p] || p).join('');
-      if (diff > 0) str += ` +${diff}`;
-      return str;
-    };
-
     if (selfCapturedEl && oppCapturedEl) {
-      selfCapturedEl.textContent = renderPieces(userIsWhite ? whiteCaptured : blackCaptured, userIsWhite ? materialDiff : -materialDiff);
-      oppCapturedEl.textContent = renderPieces(userIsWhite ? blackCaptured : whiteCaptured, userIsWhite ? -materialDiff : materialDiff);
+      selfCapturedEl.innerHTML = ChessBoard.renderCapturedHTML(
+        userIsWhite ? whiteCaptured : blackCaptured,
+        userIsWhite ? materialDiff : -materialDiff
+      );
+      oppCapturedEl.innerHTML = ChessBoard.renderCapturedHTML(
+        userIsWhite ? blackCaptured : whiteCaptured,
+        userIsWhite ? -materialDiff : materialDiff
+      );
     }
   },
 

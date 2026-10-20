@@ -80,7 +80,7 @@ const ProfilePage = {
 
     const elo = user.elo_rating || 800;
     const tier = this.getTierTitle(elo);
-    const avatar = AppConfig.AVATARS[(user.avatar_id || 1) - 1] || '👤';
+    const avatar = AppConfig.getAvatarHTML(user.avatar_id || 1);
 
     const totalGames = stats.total_games || 0;
     const wins = stats.wins || 0;
@@ -256,7 +256,7 @@ const ProfilePage = {
     if (!filtered || filtered.length === 0) {
       return `
         <div class="text-center text-muted" style="padding:32px;">
-          <div style="font-size:32px;margin-bottom:8px;">♟️</div>
+          <div style="width:36px;height:36px;margin:0 auto 8px;opacity:0.6;">${AppConfig.getPiece('P')}</div>
           <div>No matches found in this category.</div>
         </div>
       `;
@@ -275,8 +275,9 @@ const ProfilePage = {
       else if (eloChange < 0) eloBadge = `<span class="rating-change negative">${eloChange}</span>`;
       else eloBadge = `<span class="rating-change neutral">0</span>`;
 
-      const oppAvatar = AppConfig.AVATARS[(g.opponent_avatar || 1) - 1] || '👤';
-      const userColorIcon = g.user_color === 'white' ? '♔ White' : '♚ Black';
+      const oppAvatar = `<div style="width:100%;height:100%;">${AppConfig.getAvatarHTML(g.opponent_avatar || 7)}</div>`;
+      const pieceSvg = `<span style="display:inline-block;width:14px;height:14px;vertical-align:middle;margin-right:2px;">${AppConfig.getPiece(g.user_color === 'white' ? 'K' : 'k')}</span>`;
+      const userColorIcon = `${pieceSvg} ${g.user_color === 'white' ? 'White' : 'Black'}`;
 
       const timeAgo = this.formatTimeAgo(g.created_at);
       const tcLabel = this.formatTimeControl(g.time_control);
@@ -566,8 +567,8 @@ const ProfilePage = {
     AppConfig.AVATARS.forEach((av, idx) => {
       const id = idx + 1;
       gridHtml += `
-        <div class="avatar-option ${id === currentAvatar ? 'selected' : ''}" data-id="${id}">
-          ${av}
+        <div class="avatar-option ${id === currentAvatar ? 'selected' : ''}" data-id="${id}" style="display:flex;align-items:center;justify-content:center;padding:4px;">
+          ${AppConfig.getPiece(av)}
         </div>
       `;
     });

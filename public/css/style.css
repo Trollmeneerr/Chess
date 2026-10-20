@@ -24,9 +24,11 @@
   --text-dim: #94a3b8;
   --text-faint: #64748b;
   --glass: rgba(255, 255, 255, 0.03);
-  --glass-border: rgba(148, 163, 184, 0.11);
-  --glass-hover-border: rgba(56, 189, 248, 0.35);
-  --hair: rgba(148, 163, 184, 0.08);
+  --glass-border: rgba(56, 189, 248, 0.22);
+  --glass-hover-border: rgba(56, 189, 248, 0.65);
+  --blue-outline: rgba(56, 189, 248, 0.35);
+  --blue-outline-glow: 0 0 16px -2px rgba(56, 189, 248, 0.35);
+  --hair: rgba(56, 189, 248, 0.12);
 
   /* Mapping to components */
   --bg-deep: var(--p);
@@ -224,7 +226,8 @@ a {
   display: flex;
   flex-direction: column;
   background: #090e17;
-  border-right: 1px solid var(--hair);
+  border-right: 1px solid rgba(56, 189, 248, 0.22);
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.45);
   padding: 18px 14px;
   z-index: 10;
 }
@@ -299,16 +302,18 @@ a {
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(56, 189, 248, 0.08);
   color: #ffffff;
-  border-color: rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.35);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
 }
 
 .nav-item.active {
-  background: rgba(56, 189, 248, 0.1);
-  color: var(--cyan);
-  border-color: rgba(56, 189, 248, 0.28);
-  box-shadow: var(--shadow-matte-sm);
+  background: rgba(56, 189, 248, 0.14);
+  color: #ffffff;
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+  border-left: 3px solid var(--cyan);
 }
 
 .nav-item svg {
@@ -342,8 +347,15 @@ a {
   padding: 8px 10px;
   border-radius: var(--radius-sm);
   background: #111726;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  box-shadow: var(--shadow-matte-sm);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.user-panel:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
 }
 
 .user-panel.hidden { display: none; }
@@ -428,14 +440,14 @@ a {
   background-clip: text;
 }
 
-/* ---------- Matte Panels ---------- */
+/* ---------- Matte Panels with Blue Outlines ---------- */
 .glass-panel {
   background: var(--p-card);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-matte-md);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(56, 189, 248, 0.1);
 }
 
 .glass-panel-hover {
@@ -446,7 +458,7 @@ a {
 .glass-panel-hover:hover {
   background: var(--p-card-hover);
   border-color: var(--glass-hover-border);
-  box-shadow: var(--shadow-matte-lg);
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.65), var(--blue-outline-glow);
   transform: translateY(-2px);
 }
 

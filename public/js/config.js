@@ -8,7 +8,7 @@ const AppConfig = {
   get WS_BASE() {
     return window.location.origin;
   },
-  AVATARS: ['♔', '♚', '♕', '♛', '♖', '♜', '♗', '♝', '♘', '♞', '♙', '♟', '❄️', '🧊', '🏔️', '⛄'],
+  AVATARS: ['K', 'Q', 'R', 'B', 'N', 'P', 'k', 'q', 'r', 'b', 'n', 'p'],
   PIECE_UNICODE: {
     'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
     'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'
@@ -19,11 +19,17 @@ const AppConfig = {
   INITIAL_FEN: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
   getPiece(piece) {
     if (!piece) return '';
+    if (window.PIECE_SVGS && window.PIECE_SVGS[piece]) {
+      return window.PIECE_SVGS[piece];
+    }
     return this.PIECE_UNICODE[piece] || piece;
   },
   getPieceSVG(piece) {
-    if (!piece) return '';
-    return this.PIECE_UNICODE[piece] || piece;
+    return this.getPiece(piece);
+  },
+  getAvatarHTML(avatarId) {
+    const id = parseInt(avatarId, 10) || 1;
+    const pieceKey = this.AVATARS[(id - 1) % this.AVATARS.length] || 'K';
+    return `<div class="avatar-svg-inner" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">${this.getPiece(pieceKey)}</div>`;
   }
 };
-

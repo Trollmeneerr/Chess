@@ -76,8 +76,14 @@ const Auth = {
 
   showRegisterModal() {
     let avatarHTML = '';
-    AppConfig.AVATARS.forEach((av, i) => {
-      avatarHTML += `<div class="avatar-option${i === 0 ? ' selected' : ''}" data-avatar="${i + 1}">${av}</div>`;
+    AppConfig.AVATARS.forEach((pieceKey, i) => {
+      avatarHTML += `
+        <div class="avatar-option${i === 0 ? ' selected' : ''}" data-avatar="${i + 1}" title="Avatar ${i + 1}">
+          <div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;">
+            ${AppConfig.getPiece(pieceKey)}
+          </div>
+        </div>
+      `;
     });
 
     const content = document.getElementById('auth-modal-content');
@@ -184,8 +190,10 @@ const Auth = {
     if (this.currentUser) {
       userPanel?.classList.remove('hidden');
       authPanel?.classList.add('hidden');
-      const avatar = AppConfig.AVATARS[(this.currentUser.avatar_id || 1) - 1] || '♔';
-      document.getElementById('sidebar-avatar').textContent = avatar;
+      const avatarEl = document.getElementById('sidebar-avatar');
+      if (avatarEl) {
+        avatarEl.innerHTML = AppConfig.getAvatarHTML(this.currentUser.avatar_id);
+      }
       document.getElementById('sidebar-username').textContent = this.currentUser.username;
       document.getElementById('sidebar-elo').textContent = `${this.currentUser.elo_rating || 800} ELO`;
     } else {

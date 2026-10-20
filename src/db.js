@@ -123,45 +123,76 @@ const SCHEMA = {
 };
 
 async function initialize() {
-  const dbHost = process.env.DB_HOST;
-  const dbPort = process.env.DB_PORT || 3306;
-  const dbName = process.env.DB_DATABASE;
-  const dbUser = process.env.DB_USERNAME;
-  const dbPass = process.env.DB_PASSWORD;
+  const dbHost = (process.env.DB_HOST || '').trim();
+  const dbPort = parseInt(process.env.DB_PORT || '3306', 10);
+  const dbName = (process.env.DB_DATABASE || '').trim();
+  const dbUser = (process.env.DB_USERNAME || '').trim();
+  const dbPass = process.env.DB_PASSWORD || '';
+  const dbSsl = process.env.DB_SSL === 'true' || process.env.DB_SSL === '1';
 
+  console.log('[DB] Checking database configuration...');
   if (dbHost && dbName && dbUser) {
+    if (dbHost === 'localhost' || dbHost === '127.0.0.1') {
+      console.warn('[DB] Notice: DB_HOST is set to localhost/127.0.0.1.');
+      console.warn('[DB] If running in a Pelican/Pterodactyl container, connect using your Docker gateway (e.g. 172.18.0.1) or host IP.');
+    }
+
     // MySQL mode
     try {
+      console.log(`[DB] Attempting MySQL connection to ${dbUser}@${dbHost}:${dbPort}/${dbName}...`);
       const mysql = require('mysql2/promise');
       db = await mysql.createPool({
         host: dbHost,
-        port: parseInt(dbPort),
+        port: dbPort,
         database: dbName,
         user: dbUser,
-        password: dbPass || '',
+        password: dbPass,
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0,
-        connectTimeout: 5000
+        connectTimeout: 15000,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10000,
+        ssl: dbSsl ? { rejectUnauthorized: false } : undefined
       });
-      // Test connection
-      await db.execute('SELECT 1');
-      isMySQL = true;
-      console.log('[DB] Connected to MySQL/MariaDB');
 
-      // Create tables
-      await db.execute(SCHEMA.users_mysql);
-      await db.execute(SCHEMA.games_mysql);
-      await db.execute(SCHEMA.puzzles_mysql);
-      await db.execute(SCHEMA.user_puzzle_history_mysql);
-      await db.execute(SCHEMA.bot_win_log_mysql);
-      console.log('[DB] MySQL tables ready');
+      // Test connection
+      await db.query('SELECT 1');
+      isMySQL = true;
+      console.log('[DB] ✓ Successfully connected to MySQL/MariaDB');
+
+      // Create tables using query() instead of execute() to avoid ER_UNSUPPORTED_PS (error 1295)
+      await db.query(SCHEMA.users_mysql);
+      await db.query(SCHEMA.games_mysql);
+      await db.query(SCHEMA.puzzles_mysql);
+      await db.query(SCHEMA.user_puzzle_history_mysql);
+      await db.query(SCHEMA.bot_win_log_mysql);
+      console.log('[DB] ✓ MySQL schema initialized');
+
       await runMigrations();
       await seedStarterPuzzles();
       return;
     } catch (err) {
-      console.warn('[DB] MySQL connection failed, falling back to SQLite:', err.message);
+      console.error(`[DB] ✗ MySQL connection failed [Code: ${err.code || 'UNKNOWN'}]:`, err.message);
+      if (err.code === 'ECONNREFUSED') {
+        console.error(`[DB] -> Connection refused at ${dbHost}:${dbPort}.`);
+        console.error('[DB] -> Step 1: Ensure MySQL/MariaDB service is running on the host.');
+        console.error('[DB] -> Step 2: Ensure bind-address is 0.0.0.0 in /etc/mysql/mariadb.conf.d/50-server.cnf (not 127.0.0.1).');
+        console.error('[DB] -> Step 3: Ensure DB_HOST is 172.18.0.1 (Docker gateway) or node IP, not localhost.');
+      } else if (err.code === 'ER_ACCESS_DENIED_ERROR') {
+        console.error(`[DB] -> Access denied for user "${dbUser}".`);
+        console.error('[DB] -> Step 1: Verify DB_USERNAME and DB_PASSWORD match the credentials in Pelican Panel -> Databases tab.');
+        console.error('[DB] -> Step 2: Ensure user has host permissions from "%" or "172.18.%" (not just localhost).');
+      } else if (err.code === 'ER_BAD_DB_ERROR') {
+        console.error(`[DB] -> Database "${dbName}" does not exist in MySQL.`);
+        console.error(`[DB] -> Create this database in Pelican Panel or run: CREATE DATABASE \`${dbName}\`;`);
+      } else if (err.code === 'ETIMEDOUT' || err.code === 'EHOSTUNREACH') {
+        console.error(`[DB] -> Network timeout reaching ${dbHost}:${dbPort}. Check firewall rules for the Docker network.`);
+      }
+      console.warn('[DB] Falling back to SQLite database...');
     }
+  } else {
+    console.log('[DB] Notice: MySQL credentials not configured (DB_HOST, DB_DATABASE, DB_USERNAME). Defaulting to SQLite.');
   }
 
   // SQLite fallback
@@ -191,10 +222,10 @@ async function runMigrations() {
     if (isMySQL) {
       // 1. Check games table for analysis_json column
       try {
-        const [cols] = await db.execute("SHOW COLUMNS FROM games LIKE 'analysis_json'");
+        const [cols] = await db.query("SHOW COLUMNS FROM games LIKE 'analysis_json'");
         if (!cols || cols.length === 0) {
           console.log('[DB] Running migration: Adding analysis_json column to MySQL games table...');
-          await db.execute('ALTER TABLE games ADD COLUMN analysis_json LONGTEXT NULL');
+          await db.query('ALTER TABLE games ADD COLUMN analysis_json LONGTEXT NULL');
         }
       } catch (e) {
         console.warn('[DB] Migration note (games.analysis_json):', e.message);
@@ -202,10 +233,10 @@ async function runMigrations() {
 
       // 2. Check users table for avatar_id column
       try {
-        const [cols] = await db.execute("SHOW COLUMNS FROM users LIKE 'avatar_id'");
+        const [cols] = await db.query("SHOW COLUMNS FROM users LIKE 'avatar_id'");
         if (!cols || cols.length === 0) {
           console.log('[DB] Running migration: Adding avatar_id column to MySQL users table...');
-          await db.execute('ALTER TABLE users ADD COLUMN avatar_id INT DEFAULT 1');
+          await db.query('ALTER TABLE users ADD COLUMN avatar_id INT DEFAULT 1');
         }
       } catch (e) {
         console.warn('[DB] Migration note (users.avatar_id):', e.message);
@@ -261,7 +292,9 @@ async function seedStarterPuzzles() {
 
 function formatSql(sql) {
   if (isMySQL) {
-    return sql.replace(/ORDER BY RANDOM\(\)/gi, 'ORDER BY RAND()');
+    return sql
+      .replace(/ORDER BY RANDOM\(\)/gi, 'ORDER BY RAND()')
+      .replace(/INSERT OR IGNORE INTO/gi, 'INSERT IGNORE INTO');
   }
   return sql;
 }
@@ -269,49 +302,53 @@ function formatSql(sql) {
 // Unified query interface
 async function run(sql, params = []) {
   const formatted = formatSql(sql);
+  const cleanParams = (params || []).map(p => (p === undefined ? null : p));
   if (isMySQL) {
-    const [result] = await db.execute(formatted, params);
+    const [result] = await db.query(formatted, cleanParams);
     return result;
   } else {
     const stmt = db.prepare(formatted);
     if (formatted.trim().toUpperCase().startsWith('SELECT') || formatted.trim().toUpperCase().startsWith('WITH')) {
-      return stmt.all(...params);
+      return stmt.all(...cleanParams);
     } else {
-      return stmt.run(...params);
+      return stmt.run(...cleanParams);
     }
   }
 }
 
 async function get(sql, params = []) {
   const formatted = formatSql(sql);
+  const cleanParams = (params || []).map(p => (p === undefined ? null : p));
   if (isMySQL) {
-    const [rows] = await db.execute(formatted, params);
+    const [rows] = await db.query(formatted, cleanParams);
     return rows[0] || null;
   } else {
     const stmt = db.prepare(formatted);
-    return stmt.get(...params) || null;
+    return stmt.get(...cleanParams) || null;
   }
 }
 
 async function all(sql, params = []) {
   const formatted = formatSql(sql);
+  const cleanParams = (params || []).map(p => (p === undefined ? null : p));
   if (isMySQL) {
-    const [rows] = await db.execute(formatted, params);
+    const [rows] = await db.query(formatted, cleanParams);
     return rows;
   } else {
     const stmt = db.prepare(formatted);
-    return stmt.all(...params);
+    return stmt.all(...cleanParams);
   }
 }
 
 async function insert(sql, params = []) {
   const formatted = formatSql(sql);
+  const cleanParams = (params || []).map(p => (p === undefined ? null : p));
   if (isMySQL) {
-    const [result] = await db.execute(formatted, params);
+    const [result] = await db.query(formatted, cleanParams);
     return { lastInsertRowid: result.insertId, changes: result.affectedRows };
   } else {
     const stmt = db.prepare(formatted);
-    const result = stmt.run(...params);
+    const result = stmt.run(...cleanParams);
     return { lastInsertRowid: result.lastInsertRowid, changes: result.changes };
   }
 }

@@ -180,7 +180,7 @@ const BotsPage = {
     main.innerHTML = `
       <div class="page">
         <div class="board-layout">
-          <!-- Eval Bar -->
+          <!-- Eval Bar (Stockfish 16.1 Engine Powered) -->
           <div class="eval-bar-container">
             <div class="eval-bar-label" id="bot-eval-label">0.0</div>
             <div class="eval-bar">
@@ -189,47 +189,64 @@ const BotsPage = {
           </div>
 
           <div class="board-wrapper">
-            <!-- Bot bar -->
-            <div class="player-bar mb-2">
+            <!-- Bot / Opponent Card (Chess.com Style) -->
+            <div class="player-bar mb-2" id="opponent-player-bar">
               <div class="player-info-badge">
-                <span class="player-avatar" id="bot-avatar">🤖</span>
+                <div class="player-avatar-wrap">
+                  <span class="player-avatar-svg" id="bot-avatar">${AppConfig.getAvatarHTML(7)}</span>
+                </div>
                 <div>
-                  <div class="player-name" id="bot-name">Connecting...</div>
+                  <div class="player-name-row">
+                    <span class="player-name" id="bot-name">Connecting...</span>
+                    <span class="badge badge-warning" style="font-size:10px;padding:1px 5px;">BOT</span>
+                  </div>
                   <div class="player-rating" id="bot-elo"></div>
                 </div>
               </div>
-              <div class="captured-pieces" id="bot-captured"></div>
+              <div id="bot-captured"></div>
+              <div class="player-clock" id="bot-clock">AI</div>
             </div>
 
-            <!-- Board -->
+            <!-- Board Container -->
             <div id="board-container"></div>
 
-            <!-- Player bar -->
-            <div class="player-bar mt-2">
+            <!-- Player Bar (Chess.com Style) -->
+            <div class="player-bar mt-2" id="self-player-bar">
               <div class="player-info-badge">
-                <span class="player-avatar">${Auth.currentUser ? AppConfig.AVATARS[(Auth.currentUser.avatar_id || 1) - 1] : '♔'}</span>
+                <div class="player-avatar-wrap">
+                  <span class="player-avatar-svg" id="self-avatar-svg">
+                    ${AppConfig.getPiece(colorPreference === 'black' ? 'k' : 'K')}
+                  </span>
+                </div>
                 <div>
-                  <div class="player-name">${Auth.currentUser ? Auth.currentUser.username : 'You'}</div>
-                  <div class="player-rating">${Auth.currentUser ? Auth.currentUser.elo_rating + ' ELO' : ''}</div>
+                  <div class="player-name-row">
+                    <span class="player-name">${Auth.currentUser ? Auth.currentUser.username : 'You'}</span>
+                    <span class="badge badge-accent" style="font-size:10px;padding:1px 5px;">YOU</span>
+                  </div>
+                  <div class="player-rating">${Auth.currentUser ? Auth.currentUser.elo_rating + ' ELO' : 'Guest'}</div>
                 </div>
               </div>
-              <div class="captured-pieces" id="player-captured"></div>
+              <div id="player-captured"></div>
+              <div class="player-clock active-turn" id="player-clock">LIVE</div>
             </div>
           </div>
 
-          <!-- Right Dock Panel -->
+          <!-- Right Dock Panel (Chess.com Style) -->
           <div class="dock-panel">
             <div class="glass-panel" style="padding:14px;">
-              <h3 style="font-size:14px;color:var(--text-secondary);margin-bottom:4px;">OPPONENT</h3>
-              <div style="font-size:16px;font-weight:700;color:var(--text-primary);" id="dock-bot-name">...</div>
-              <div style="font-size:12px;color:var(--text-muted);margin-top:2px;" id="dock-bot-desc">...</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span class="badge badge-accent"><span class="pulse-dot"></span> STOCKFISH 16.1</span>
+                <span class="badge badge-warning" id="dock-tier-badge">AI BOT</span>
+              </div>
+              <div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-top:8px;" id="dock-bot-name">...</div>
+              <div style="font-size:12px;color:var(--text-dim);margin-top:2px;" id="dock-bot-desc">...</div>
             </div>
 
             <!-- Move List -->
             <div class="move-list-container glass-panel">
               <div class="move-list-header">
-                <h3>Moves</h3>
-                <span class="badge badge-warning">BOT</span>
+                <h3>Move History</h3>
+                <span class="badge badge-accent" id="eval-status-badge">Eval: 0.0</span>
               </div>
               <div class="move-list" id="bot-move-list-grid"></div>
             </div>
@@ -238,7 +255,7 @@ const BotsPage = {
             <div class="game-controls glass-panel">
               <button class="btn btn-danger btn-sm" id="btn-bot-resign">Resign</button>
               <button class="btn btn-ghost btn-sm" id="btn-bot-flip">Flip</button>
-              <button class="btn btn-primary btn-sm" onclick="App.navigateTo('bots')">Exit</button>
+              <button class="btn btn-primary btn-sm" onclick="App.navigateTo('bots')">Roster</button>
             </div>
           </div>
         </div>
@@ -276,8 +293,13 @@ const BotsPage = {
       document.getElementById('dock-bot-name').textContent = `${data.botName} (${data.botElo} ELO)`;
       document.getElementById('dock-bot-desc').textContent = data.botDescription || 'Stockfish calibrated opponent';
 
-      const avatarSymbol = AppConfig.AVATARS[(data.botAvatar || 1) - 1] || '🤖';
-      document.getElementById('bot-avatar').textContent = avatarSymbol;
+      const botAvatarEl = document.getElementById('bot-avatar');
+      if (botAvatarEl) botAvatarEl.innerHTML = AppConfig.getAvatarHTML(data.botAvatar || 7);
+
+      const selfAvatarEl = document.getElementById('self-avatar-svg');
+      if (selfAvatarEl) {
+        selfAvatarEl.innerHTML = AppConfig.getPiece(data.playerColor === 'black' ? 'k' : 'K');
+      }
 
       ChessBoard.init('board-container', {
         orientation: data.playerColor,
@@ -289,6 +311,9 @@ const BotsPage = {
           this.socket.emit('move', { game_id: data.gameId, move });
         }
       });
+
+      // Initial Stockfish evaluation
+      this.updateEvaluation(data.fen);
     });
 
     this.socket.on('move_made', (data) => {
@@ -338,6 +363,9 @@ const BotsPage = {
     });
   },
 
+  /**
+   * Evaluate board position with Stockfish Engine for the ELO bar
+   */
   async updateEvaluation(fen) {
     try {
       const res = await Api.post('/analysis/evaluate', { fen });
@@ -346,19 +374,40 @@ const BotsPage = {
         this.currentEval = ev;
         const fillEl = document.getElementById('bot-eval-fill');
         const labelEl = document.getElementById('bot-eval-label');
+        const statusBadge = document.getElementById('eval-status-badge');
+
+        const isPlayerWhite = (this.activeGame?.playerColor || 'white') === 'white';
+
+        let labelText = '';
+        let percent = 50;
+
+        if (res.mate !== null && res.mate !== undefined) {
+          // Mate in N detected by Stockfish
+          if (res.mate > 0) {
+            labelText = `M${res.mate}`;
+            percent = 100;
+          } else {
+            labelText = `-M${Math.abs(res.mate)}`;
+            percent = 0;
+          }
+        } else {
+          // Centipawns: clamp between -8 and +8 for smooth height display
+          const clamped = Math.max(-8, Math.min(8, ev));
+          percent = 50 + (clamped / 16) * 100;
+          const sign = ev > 0 ? '+' : '';
+          labelText = `${sign}${ev.toFixed(1)}`;
+        }
 
         if (fillEl && labelEl) {
-          // Clamp score between -5 and +5 for height calculation
-          const clamped = Math.max(-5, Math.min(5, ev));
-          const percent = 50 + (clamped / 10) * 100;
-          fillEl.style.height = `${percent}%`;
-
-          const sign = ev > 0 ? '+' : '';
-          labelEl.textContent = `${sign}${ev.toFixed(1)}`;
+          // If player is white, white fills up from bottom; if black, inverted
+          const heightPercent = isPlayerWhite ? percent : (100 - percent);
+          fillEl.style.height = `${Math.max(2, Math.min(98, heightPercent))}%`;
+          labelEl.textContent = labelText;
+          if (statusBadge) statusBadge.textContent = `Eval: ${labelText}`;
         }
       }
     } catch (e) {
-      // ignore
+      console.warn('[Bots] Stockfish evaluation failed:', e);
     }
   },
 
@@ -389,15 +438,15 @@ const BotsPage = {
     const playerCapturedEl = document.getElementById('player-captured');
     const botCapturedEl = document.getElementById('bot-captured');
 
-    const renderPieces = (pieces, diff) => {
-      let str = pieces.map(p => AppConfig.PIECE_UNICODE[p] || p).join('');
-      if (diff > 0) str += ` +${diff}`;
-      return str;
-    };
-
     if (playerCapturedEl && botCapturedEl) {
-      playerCapturedEl.textContent = renderPieces(playerIsWhite ? whiteCaptured : blackCaptured, playerIsWhite ? materialDiff : -materialDiff);
-      botCapturedEl.textContent = renderPieces(playerIsWhite ? blackCaptured : whiteCaptured, playerIsWhite ? -materialDiff : materialDiff);
+      playerCapturedEl.innerHTML = ChessBoard.renderCapturedHTML(
+        playerIsWhite ? whiteCaptured : blackCaptured,
+        playerIsWhite ? materialDiff : -materialDiff
+      );
+      botCapturedEl.innerHTML = ChessBoard.renderCapturedHTML(
+        playerIsWhite ? blackCaptured : whiteCaptured,
+        playerIsWhite ? -materialDiff : materialDiff
+      );
     }
   },
 

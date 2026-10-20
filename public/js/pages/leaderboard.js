@@ -51,14 +51,14 @@ const LeaderboardPage = {
         else if (rank === 2) rankClass = 'silver';
         else if (rank === 3) rankClass = 'bronze';
 
-        const avatar = AppConfig.AVATARS[(p.avatar_id || 1) - 1] || '👤';
+        const avatarSvg = AppConfig.getAvatarHTML(p.avatar_id || 1);
 
         rows += `
           <tr style="cursor:pointer;" onclick="App.navigateTo('profile', '${p.username}')" title="View ${p.username}'s Profile">
             <td class="leaderboard-rank ${rankClass}">#${rank}</td>
             <td>
               <div class="leaderboard-player">
-                <span class="leaderboard-avatar">${avatar}</span>
+                <span class="leaderboard-avatar" style="padding:2px;">${avatarSvg}</span>
                 <span style="font-weight:600;color:var(--text-primary);">${p.username}</span>
                 ${Auth.currentUser && Auth.currentUser.username === p.username ? '<span class="badge badge-accent ml-1" style="font-size:10px;">YOU</span>' : ''}
               </div>

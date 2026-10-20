@@ -142,7 +142,7 @@ const AnalysisPage = {
     if (!this.myMatches || this.myMatches.length === 0) {
       container.innerHTML = `
         <div class="glass-panel text-center" style="padding:48px;">
-          <div style="font-size:36px;margin-bottom:8px;">♟️</div>
+          <div style="width:48px;height:48px;margin:0 auto 12px;opacity:0.6;">${AppConfig.getPiece('P')}</div>
           <h3>No Finished Games Yet</h3>
           <p class="text-secondary mt-1">Play a match against AI Bots or a friend to record and review games here.</p>
           <div class="mt-3" style="display:flex;gap:10px;justify-content:center;">
@@ -378,8 +378,9 @@ const AnalysisPage = {
       const resultClass = isWin ? 'outcome-win' : (isLoss ? 'outcome-loss' : '');
       const resultText = isWin ? 'WIN' : (isLoss ? 'LOSS' : 'DRAW');
 
-      const oppAvatar = AppConfig.AVATARS[(g.opponent_avatar || 1) - 1] || '👤';
-      const userColorLabel = g.user_color === 'white' ? '♔ White' : '♚ Black';
+      const oppAvatar = `<div style="width:100%;height:100%;">${AppConfig.getAvatarHTML(g.opponent_avatar || 7)}</div>`;
+      const pieceSvg = `<span style="display:inline-block;width:14px;height:14px;vertical-align:middle;margin-right:2px;">${AppConfig.getPiece(g.user_color === 'white' ? 'K' : 'k')}</span>`;
+      const userColorLabel = `${pieceSvg} ${g.user_color === 'white' ? 'White' : 'Black'}`;
       const timeAgo = this.formatTimeAgo(g.created_at);
       const tcLabel = this.formatTimeControl(g.time_control);
 

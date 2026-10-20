@@ -372,7 +372,7 @@ router.post('/evaluate', async (req, res) => {
 
     if (!stockfish.isAvailable()) {
       const c = new Chess(fen);
-      const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+      const pieceValues = { p: 1, n: 3, b: 3.15, r: 5, q: 9, k: 0 };
       let w = 0, bl = 0;
       for (const row of c.board()) {
         for (const sq of row) {
@@ -381,17 +381,20 @@ router.post('/evaluate', async (req, res) => {
           else bl += pieceValues[sq.type] || 0;
         }
       }
-      return res.json({ fen, eval: w - bl, scoreType: 'cp', bestmove: null });
+      const evalScore = Math.round((w - bl) * 10) / 10;
+      return res.json({ fen, eval: evalScore, scoreType: 'cp', mate: null, bestmove: null });
     }
 
-    const result = await stockfish.evaluate(fen);
+    const result = await stockfish.evaluate(fen, 8, 400);
     res.json({
       fen,
       eval: result.score,
       scoreType: result.scoreType,
+      mate: result.mate !== undefined ? result.mate : null,
       bestmove: result.bestmove
     });
   } catch (err) {
+    console.error('[Analysis] Evaluate error:', err.message);
     res.status(500).json({ error: 'Evaluation failed' });
   }
 });
