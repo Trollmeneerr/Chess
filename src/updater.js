@@ -93,21 +93,36 @@ async function checkAndApplyUpdates() {
     return false;
   }
 
-  const gitDir = path.join(ROOT_DIR, '.git');
-  if (!fs.existsSync(gitDir)) {
-    console.log('[Updater] Notice: No .git directory found. Skipping repository update check');
-    return false;
-  }
-
   const gitBin = findGitBinary();
   if (!gitBin) {
-    console.log('[Updater] Notice: Git binary not found in system PATH. Skipping update check');
+    console.log('[Updater] Notice: Git binary not found in system PATH. Skipping repository update check');
     return false;
   }
 
-  console.log('[Updater] Checking for updates on remote repository...');
+  // Configure git safe.directory to avoid Docker UID/GID ownership errors
+  try {
+    runGit(gitBin, ['config', '--global', '--add', 'safe.directory', '*']);
+  } catch (e) {}
 
   try {
+    const gitDir = path.join(ROOT_DIR, '.git');
+    if (!fs.existsSync(gitDir)) {
+      console.log('[Updater] Notice: No .git directory found. Initializing git repository and linking to remote origin...');
+      try {
+        runGit(gitBin, ['init']);
+        runGit(gitBin, ['remote', 'add', 'origin', 'https://github.com/Trollmeneerr/Chess.git']);
+        runGit(gitBin, ['fetch', 'origin', 'main']);
+        runGit(gitBin, ['reset', '--hard', 'origin/main']);
+        console.log('[Updater] ✓ Git repository successfully initialized and linked to origin/main');
+        return false;
+      } catch (initErr) {
+        console.warn('[Updater] Could not auto-initialize git repository:', initErr.message);
+        return false;
+      }
+    }
+
+    console.log('[Updater] Checking for updates on remote repository...');
+
     // 1. Get current branch (default to main)
     let branch = 'main';
     try {
@@ -115,8 +130,16 @@ async function checkAndApplyUpdates() {
       if (b && b !== 'HEAD') branch = b;
     } catch (e) {}
 
+    // Ensure remote origin is set
+    try {
+      const remoteUrl = runGit(gitBin, ['config', '--get', 'remote.origin.url']).trim();
+      if (!remoteUrl) {
+        runGit(gitBin, ['remote', 'add', 'origin', 'https://github.com/Trollmeneerr/Chess.git']);
+      }
+    } catch (e) {}
+
     // 2. Fetch remote branch
-    runGit(gitBin, ['fetch', 'origin', branch, '--quiet'], { timeout: 20000 });
+    runGit(gitBin, ['fetch', 'origin', branch, '--quiet'], { timeout: 30000 });
 
     // 3. Compare local HEAD and remote tracking branch
     const localHash = runGit(gitBin, ['rev-parse', 'HEAD']).trim();
@@ -124,7 +147,6 @@ async function checkAndApplyUpdates() {
     try {
       remoteHash = runGit(gitBin, ['rev-parse', `origin/${branch}`]).trim();
     } catch (e) {
-      // Remote branch ref might not exist or match
       remoteHash = localHash;
     }
 
@@ -133,18 +155,23 @@ async function checkAndApplyUpdates() {
       return false;
     }
 
-    // 4. Updates available!
-    let commitCount = '?';
+    // 4. Check how many commits remote is ahead of local
+    let newCommitsCount = 0;
     try {
-      commitCount = runGit(gitBin, ['rev-list', '--count', `HEAD..origin/${branch}`]).trim();
+      const countStr = runGit(gitBin, ['rev-list', '--count', `HEAD..origin/${branch}`]).trim();
+      newCommitsCount = parseInt(countStr, 10) || 0;
     } catch (e) {}
 
-    console.log(`[Updater] ⬇ New updates available! Local: ${localHash.substring(0, 7)} -> Remote: ${remoteHash.substring(0, 7)} (${commitCount} new commit(s))`);
-    console.log(`[Updater] Pulling latest changes from origin/${branch}...`);
+    if (newCommitsCount <= 0) {
+      console.log(`[Updater] ✓ Server is up to date. (Local commit ${localHash.substring(0, 7)} is ahead of remote origin/${branch} ${remoteHash.substring(0, 7)})`);
+      return false;
+    }
 
-    // 5. Pull updates
-    runGit(gitBin, ['pull', 'origin', branch, '--ff-only']);
-    console.log(`[Updater] ✓ Code updated to commit ${remoteHash.substring(0, 7)}`);
+    console.log(`[Updater] ⬇ New updates available! Downloading ${newCommitsCount} commit(s) from origin/${branch} (${localHash.substring(0, 7)} -> ${remoteHash.substring(0, 7)})...`);
+
+    // 5. Cleanly sync working tree to remote branch (prevents dirty state or merge conflict aborts)
+    runGit(gitBin, ['reset', '--hard', `origin/${branch}`]);
+    console.log(`[Updater] ✓ Files successfully updated to commit ${remoteHash.substring(0, 7)}`);
 
     // 6. Check if dependencies changed
     let pkgChanged = false;
