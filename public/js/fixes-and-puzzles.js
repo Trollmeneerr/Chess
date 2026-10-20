@@ -121,7 +121,8 @@ const puzzleState = {
   currentPuzzle: null,
   solutionIndex: 1, // Index 0 is opponent's setup move; player starts at 1
   penaltyCount: 0,
-  reward: 1
+  reward: 1,
+  isFinished: false
 };
 
 /**
@@ -133,13 +134,14 @@ function executeUciMoveOnBoard(uciMove) {
   const to = uciMove.slice(2, 4);
   const promo = uciMove.length > 4 ? uciMove[4] : undefined;
 
-  if (window.ChessBoard) {
-    const curFen = window.ChessBoard.fen || (puzzleState.currentPuzzle ? puzzleState.currentPuzzle.fen : null);
+  const cb = window.ChessBoard || (typeof ChessBoard !== 'undefined' ? ChessBoard : null);
+  if (cb) {
+    const curFen = cb.fen || (puzzleState.currentPuzzle ? puzzleState.currentPuzzle.fen : null);
     if (typeof window.Chess === 'function' && curFen) {
       try {
         const c = new window.Chess(curFen);
         c.move({ from, to, promotion: promo });
-        window.ChessBoard.update(c.fen(), { lastMove: { from, to } });
+        cb.update(c.fen(), { lastMove: { from, to } });
         return;
       } catch (err) {
         // Continue to fallback
@@ -176,6 +178,8 @@ function loadSeededPuzzle(verifiedPuzzles, seed = Date.now()) {
   puzzleState.solutionIndex = 1;
   puzzleState.penaltyCount = 0;
   puzzleState.reward = 1;
+  puzzleState.isFinished = false;
+  if (window.PuzzlesPage) window.PuzzlesPage.isFinished = false;
   updatePuzzleRewardUI();
 
   // Determine player color: Initial FEN turn indicates who makes the setup blunder
@@ -183,9 +187,11 @@ function loadSeededPuzzle(verifiedPuzzles, seed = Date.now()) {
   const playerColor = initialTurn === 'w' ? 'black' : 'white';
 
   // Initialize board with orientation and initial FEN
-  if (window.ChessBoard) {
-    window.ChessBoard.init('board-container', {
+  const cb = window.ChessBoard || (typeof ChessBoard !== 'undefined' ? ChessBoard : null);
+  if (cb) {
+    cb.init('board-container', {
       orientation: playerColor,
+      playerColor: playerColor,
       fen: puzzle.fen,
       interactive: false
     });
@@ -209,14 +215,13 @@ function loadSeededPuzzle(verifiedPuzzles, seed = Date.now()) {
     }
 
     // Now enable board for player's move
-    if (window.ChessBoard) {
-      window.ChessBoard.interactive = true;
-      window.ChessBoard.onMove = (attempt) => {
-        const uci = attempt.from + attempt.to + (attempt.promotion || '');
+    if (cb) {
+      cb.interactive = true;
+      cb.onMove = (attempt) => {
         return handlePuzzlePlayerMove(attempt.from, attempt.to, attempt.promotion);
       };
-      window.ChessBoard.render();
-      window.ChessBoard.bindEvents();
+      cb.render();
+      cb.bindEvents();
     }
 
     const turnInd = document.getElementById('puzzle-turn-indicator');
@@ -275,11 +280,12 @@ function handlePuzzlePlayerMove(fromSq, toSq, promo = '') {
     }
 
     // Snap piece back to its original square
-    if (window.ChessBoard) {
-      window.ChessBoard.selectedSquare = null;
-      window.ChessBoard.legalMoves = [];
-      window.ChessBoard.render();
-      window.ChessBoard.bindEvents();
+    const cb = window.ChessBoard || (typeof ChessBoard !== 'undefined' ? ChessBoard : null);
+    if (cb) {
+      cb.selectedSquare = null;
+      cb.legalMoves = [];
+      cb.render();
+      cb.bindEvents();
     }
     return false;
   }
@@ -300,8 +306,9 @@ function handlePuzzlePlayerMove(fromSq, toSq, promo = '') {
 
   // Auto-play opponent response if more moves remain
   const replyUci = puzzleState.currentPuzzle.moves[puzzleState.solutionIndex];
+  const cb = window.ChessBoard || (typeof ChessBoard !== 'undefined' ? ChessBoard : null);
   if (replyUci) {
-    if (window.ChessBoard) window.ChessBoard.interactive = false;
+    if (cb) cb.interactive = false;
     setTimeout(() => {
       if (typeof resetBoardVisualState === 'function') {
         resetBoardVisualState();
@@ -316,9 +323,9 @@ function handlePuzzlePlayerMove(fromSq, toSq, promo = '') {
 
       // Re-enable for subsequent player moves
       if (puzzleState.solutionIndex < puzzleState.currentPuzzle.moves.length) {
-        if (window.ChessBoard) {
-          window.ChessBoard.interactive = true;
-          window.ChessBoard.bindEvents();
+        if (cb) {
+          cb.interactive = true;
+          cb.bindEvents();
         }
       } else {
         // Complete puzzle if reply was final
@@ -333,6 +340,10 @@ function handlePuzzlePlayerMove(fromSq, toSq, promo = '') {
 }
 
 function onPuzzleFinishedSuccessfully() {
+  puzzleState.isFinished = true;
+  if (window.PuzzlesPage) {
+    window.PuzzlesPage.isFinished = true;
+  }
   if (typeof playChessSound === 'function') {
     playChessSound('game_over');
   }

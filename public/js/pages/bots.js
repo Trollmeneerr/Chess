@@ -6,6 +6,7 @@ const BotsPage = {
   activeGame: null,
   activeBot: null,
   currentEval: 0,
+  isGameOver: false,
 
   render(selectedBotElo = null) {
     this.renderRoster().then(() => {
@@ -353,6 +354,7 @@ const BotsPage = {
 
     this.socket.on('game_started', (data) => {
       this.activeGame = data;
+      this.isGameOver = false;
       this.activeBot = { name: data.botName, elo: data.botElo, avatar: data.botAvatar };
 
       document.getElementById('bot-name').textContent = data.botName;
@@ -423,7 +425,7 @@ const BotsPage = {
 
     document.getElementById('btn-bot-resign')?.addEventListener('click', () => {
       if (confirm('Resign this game against the bot?')) {
-        this.socket.emit('resign', { game_id: this.activeGame?.gameId });
+        this.resign();
       }
     });
 
@@ -520,6 +522,7 @@ const BotsPage = {
   },
 
   handleGameOver(data) {
+    this.isGameOver = true;
     PlayPage.playSound('game_over');
 
     const isWinner = data.winner === 'player';
@@ -574,5 +577,15 @@ const BotsPage = {
         BotsPage.startBotMatch(this.activeGame?.botElo);
       });
     }
+  },
+
+  resign() {
+    if (this.socket && this.activeGame && !this.isGameOver) {
+      this.socket.emit('resign', { game_id: this.activeGame.gameId });
+      this.isGameOver = true;
+      this.activeGame = null;
+    }
   }
 };
+
+window.BotsPage = BotsPage;

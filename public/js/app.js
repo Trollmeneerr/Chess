@@ -21,6 +21,136 @@ const App = {
 
     // Listen for browser popstate
     window.addEventListener('popstate', () => this.handleRoute());
+
+    // Warn on page unload / refresh if match or puzzle in progress
+    window.addEventListener('beforeunload', (e) => {
+      if (this.isMatchOrPuzzleInProgress()) {
+        e.preventDefault();
+        e.returnValue = 'You have an active game/puzzle in progress. Leaving will automatically resign and forfeit ELO.';
+        return e.returnValue;
+      }
+    });
+  },
+
+  isMatchOrPuzzleInProgress() {
+    const isPvpActive = window.PlayPage &&
+      window.PlayPage.socket &&
+      window.PlayPage.socket.connected &&
+      window.PlayPage.currentGame &&
+      window.PlayPage.gameActive &&
+      !window.PlayPage.isGameOver &&
+      (window.PlayPage.currentGame.role === 'white' || window.PlayPage.currentGame.role === 'black');
+
+    const isBotActive = window.BotsPage &&
+      window.BotsPage.socket &&
+      window.BotsPage.socket.connected &&
+      window.BotsPage.activeGame &&
+      !window.BotsPage.isGameOver;
+
+    const isPuzzleActive = this.currentPage === 'puzzles' &&
+      Boolean(window.puzzleState?.currentPuzzle || window.PuzzlesPage?.currentPuzzle) &&
+      !window.puzzleState?.isFinished &&
+      !window.PuzzlesPage?.isFinished;
+
+    return Boolean(isPvpActive || isBotActive || isPuzzleActive);
+  },
+
+  confirmLeaveActiveMatchOrPuzzle(destinationPage) {
+    if (this.currentPage === destinationPage) {
+      return true;
+    }
+
+    // 1. Check PvP match
+    const isPvpActive = window.PlayPage &&
+      window.PlayPage.socket &&
+      window.PlayPage.socket.connected &&
+      window.PlayPage.currentGame &&
+      window.PlayPage.gameActive &&
+      !window.PlayPage.isGameOver &&
+      (window.PlayPage.currentGame.role === 'white' || window.PlayPage.currentGame.role === 'black');
+
+    if (isPvpActive) {
+      const ok = window.confirm(
+        'You are currently in an active game. Leaving now will automatically resign the match and you will lose ELO.\n\nAre you sure you want to leave?'
+      );
+      if (!ok) return false;
+
+      try {
+        if (typeof window.PlayPage.resign === 'function') {
+          window.PlayPage.resign();
+        } else if (window.PlayPage.socket && (window.PlayPage.currentGame?.invite_code || window.PlayPage.currentInviteCode)) {
+          window.PlayPage.socket.emit('resign', { invite_code: window.PlayPage.currentGame?.invite_code || window.PlayPage.currentInviteCode });
+          window.PlayPage.gameActive = false;
+          window.PlayPage.isGameOver = true;
+        }
+      } catch (err) {
+        console.warn('[Auto-Resign PvP] Error:', err);
+      }
+      return true;
+    }
+
+    // 2. Check Bot match
+    const isBotActive = window.BotsPage &&
+      window.BotsPage.socket &&
+      window.BotsPage.socket.connected &&
+      window.BotsPage.activeGame &&
+      !window.BotsPage.isGameOver;
+
+    if (isBotActive) {
+      const ok = window.confirm(
+        'You are currently playing against a bot. Leaving now will automatically resign the match.\n\nAre you sure you want to leave?'
+      );
+      if (!ok) return false;
+
+      try {
+        if (typeof window.BotsPage.resign === 'function') {
+          window.BotsPage.resign();
+        } else if (window.BotsPage.socket && window.BotsPage.activeGame?.gameId) {
+          window.BotsPage.socket.emit('resign', { game_id: window.BotsPage.activeGame.gameId });
+          window.BotsPage.isGameOver = true;
+          window.BotsPage.activeGame = null;
+        }
+      } catch (err) {
+        console.warn('[Auto-Resign Bot] Error:', err);
+      }
+      return true;
+    }
+
+    // 3. Check Tactical Puzzle
+    const isPuzzleActive = this.currentPage === 'puzzles' &&
+      Boolean(window.puzzleState?.currentPuzzle || window.PuzzlesPage?.currentPuzzle) &&
+      !window.puzzleState?.isFinished &&
+      !window.PuzzlesPage?.isFinished;
+
+    if (isPuzzleActive) {
+      const ok = window.confirm(
+        'You are currently solving a puzzle. Leaving now will automatically forfeit the puzzle and you will lose ELO.\n\nAre you sure you want to leave?'
+      );
+      if (!ok) return false;
+
+      if (window.puzzleState) window.puzzleState.isFinished = true;
+      if (window.PuzzlesPage) window.PuzzlesPage.isFinished = true;
+
+      const puzzle = window.puzzleState?.currentPuzzle || window.PuzzlesPage?.currentPuzzle;
+      if (window.Auth && window.Auth.currentUser && window.Api && puzzle) {
+        const puzzleId = puzzle.id || puzzle.puzzle_id;
+        window.Api.post(`/puzzles/${puzzleId}/attempt`, {
+          solved: false,
+          reward: -1,
+          penalty_count: 99
+        }).then(res => {
+          if (res && res.new_elo !== undefined) {
+            window.Auth.currentUser.elo_rating = res.new_elo;
+            window.Auth.updateUI();
+          }
+        }).catch(err => {
+          console.warn('[Auto-Resign Puzzle] Error recording attempt:', err);
+        });
+      }
+      return true;
+    }
+
+    return true;
   },
 
   bindNavigation() {
@@ -95,10 +225,23 @@ const App = {
       route = 'lobby';
     }
 
+    // Intercept if navigating away from active game/puzzle via history back/forward
+    if (this.currentPage && route !== this.currentPage) {
+      if (!this.confirmLeaveActiveMatchOrPuzzle(route)) {
+        const revertPath = this.currentPage === 'lobby' ? '/' : `/${this.currentPage}`;
+        window.history.pushState({ page: this.currentPage }, '', revertPath);
+        return;
+      }
+    }
+
     this.renderPage(route, params);
   },
 
   navigateTo(page, params = null) {
+    if (!this.confirmLeaveActiveMatchOrPuzzle(page)) {
+      return;
+    }
+
     let targetPath = `/${page}`;
     if (params && typeof params === 'string') {
       targetPath = `/${page}/${params}`;

@@ -78,3 +78,5 @@ const LeaderboardPage = {
     }
   }
 };
+
+window.LeaderboardPage = LeaderboardPage;

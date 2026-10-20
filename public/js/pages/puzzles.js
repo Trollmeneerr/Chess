@@ -36,7 +36,7 @@ const PuzzlesPage = {
                 <div id="eval-fill" class="eval-fill" style="height: 50%;"></div>
                 <span id="eval-score" class="eval-score">0.0</span>
               </div>
-              <div id="board-container"></div>
+              <div id="board-container" style="min-width:320px;min-height:320px;display:flex;justify-content:center;align-items:center;"></div>
             </div>
           </div>
 
@@ -114,6 +114,11 @@ const PuzzlesPage = {
       resetBoardVisualState();
     }
 
+    this.isFinished = false;
+    if (window.puzzleState) {
+      window.puzzleState.isFinished = false;
+    }
+
     // Filter verified puzzles by difficulty bracket if possible
     const allVerified = (window.VERIFIED_PUZZLES && window.VERIFIED_PUZZLES.length > 0)
       ? window.VERIFIED_PUZZLES
@@ -159,6 +164,16 @@ const PuzzlesPage = {
       };
       if (typeof loadSeededPuzzle === 'function') {
         loadSeededPuzzle([puzzleObj], seed);
+        this.currentPuzzle = window.puzzleState?.currentPuzzle;
+        if (this.currentPuzzle) {
+          const ratingEl = document.getElementById('puzzle-rating');
+          if (ratingEl) ratingEl.textContent = `${this.currentPuzzle.rating} Rating`;
+          const themeContainer = document.getElementById('puzzle-themes');
+          if (themeContainer) {
+            const tags = (this.currentPuzzle.themes || 'tactics').split(' ').map(t => `<span class="puzzle-theme-tag">${t}</span>`).join('');
+            themeContainer.innerHTML = tags;
+          }
+        }
       }
     } catch (err) {
       console.error('[Puzzles] Error loading puzzle:', err);
@@ -316,3 +331,5 @@ const PuzzlesPage = {
     }
   }
 };
+
+window.PuzzlesPage = PuzzlesPage;

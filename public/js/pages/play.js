@@ -4,6 +4,9 @@
 const PlayPage = {
   socket: null,
   currentGame: null,
+  gameActive: false,
+  isGameOver: false,
+  currentInviteCode: null,
   selectedTimeControl: 'rapid',
   selectedColor: 'random',
   clockInterval: null,
@@ -425,7 +428,7 @@ const PlayPage = {
     // Controls
     document.getElementById('btn-resign')?.addEventListener('click', () => {
       if (confirm('Are you sure you want to resign this game?')) {
-        this.socket.emit('resign', { invite_code: inviteCode });
+        this.resign();
       }
     });
 
@@ -441,6 +444,9 @@ const PlayPage = {
 
   handleGameState(data, inviteCode) {
     this.currentGame = data;
+    this.currentInviteCode = inviteCode;
+    this.gameActive = !data.result;
+    this.isGameOver = !!data.result;
     const playerRole = data.role; // 'white', 'black', or 'spectator'
     const userIsWhite = playerRole === 'white';
     const orientation = playerRole === 'black' ? 'black' : 'white';
@@ -600,6 +606,8 @@ const PlayPage = {
 
   handleGameOver(data, inviteCode) {
     clearInterval(this.clockInterval);
+    this.gameActive = false;
+    this.isGameOver = true;
     this.playSound('game_over');
 
     const userIsWhite = this.currentGame?.role === 'white';
@@ -683,5 +691,16 @@ const PlayPage = {
 
   escapeHtml(str) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  },
+
+  resign() {
+    if (this.socket && (this.currentGame || this.currentInviteCode) && !this.isGameOver) {
+      const code = this.currentGame?.invite_code || this.currentInviteCode;
+      this.socket.emit('resign', { invite_code: code });
+      this.gameActive = false;
+      this.isGameOver = true;
+    }
   }
 };
+
+window.PlayPage = PlayPage;

@@ -561,12 +561,33 @@
 /* --- Puzzle Page --- */
 .puzzle-container {
   display: flex;
-  gap: 20px;
+  gap: 24px;
   align-items: flex-start;
+  justify-content: center;
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.puzzle-container .board-wrapper {
+  flex: 1 1 auto;
+  max-width: 820px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.puzzle-container #board-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 320px;
+  min-height: 320px;
+  width: 100%;
 }
 
 .puzzle-sidebar {
-  width: 280px;
+  width: 300px;
   flex-shrink: 0;
 }
 

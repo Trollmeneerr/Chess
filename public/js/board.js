@@ -1221,3 +1221,4 @@ window.showMoveAnalysis = showMoveAnalysis;
 ChessBoard.drawMoveArrow = drawMoveArrow;
 ChessBoard.clearAnnotationsAndPremoves = clearAnnotationsAndPremoves;
 ChessBoard.showMoveAnalysis = showMoveAnalysis;
+window.ChessBoard = ChessBoard;
