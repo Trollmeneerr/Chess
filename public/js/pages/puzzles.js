@@ -50,6 +50,12 @@ const PuzzlesPage = {
 
             <div class="puzzle-feedback glass-panel hidden" id="puzzle-feedback"></div>
 
+            <!-- Puzzle Controls Bar -->
+            <div class="puzzle-toolbar">
+              <span id="puzzle-reward-badge" class="badge">Reward: +1</span>
+              <button data-action="puzzle-hint" class="btn-blue-sm" id="btn-puzzle-hint">Hint</button>
+            </div>
+
             <div class="glass-panel difficulty-selector mb-2">
               <h4>Difficulty</h4>
               <div class="difficulty-options">
@@ -62,7 +68,7 @@ const PuzzlesPage = {
             </div>
 
             <div class="glass-panel" style="padding:14px;display:flex;gap:8px;">
-              <button class="btn btn-ghost btn-block" id="btn-puzzle-hint">Hint</button>
+              <button data-action="puzzle-hint" class="btn btn-ghost btn-block" id="btn-puzzle-hint-alt">Hint</button>
               <button class="btn btn-primary btn-block" id="btn-next-puzzle">Next Puzzle</button>
             </div>
           </div>
@@ -89,17 +95,52 @@ const PuzzlesPage = {
       this.loadPuzzle();
     });
 
-    document.getElementById('btn-puzzle-hint')?.addEventListener('click', () => {
+    document.getElementById('btn-puzzle-hint')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this.revealHint();
+    });
+
+    document.getElementById('btn-puzzle-hint-alt')?.addEventListener('click', (e) => {
+      e.preventDefault();
       this.revealHint();
     });
   },
 
-  async loadPuzzle() {
+  async loadPuzzle(seed = Date.now()) {
     const feedback = document.getElementById('puzzle-feedback');
     if (feedback) feedback.classList.add('hidden');
 
-    this.usedSolution = false;
-    this.isFinished = false;
+    if (typeof resetBoardVisualState === 'function') {
+      resetBoardVisualState();
+    }
+
+    // Filter verified puzzles by difficulty bracket if possible
+    const allVerified = (window.VERIFIED_PUZZLES && window.VERIFIED_PUZZLES.length > 0)
+      ? window.VERIFIED_PUZZLES
+      : [];
+    
+    let pool = allVerified;
+    if (this.currentDifficulty === 'easy') pool = allVerified.filter(p => p.rating < 900);
+    else if (this.currentDifficulty === 'medium') pool = allVerified.filter(p => p.rating >= 900 && p.rating < 1400);
+    else if (this.currentDifficulty === 'hard') pool = allVerified.filter(p => p.rating >= 1400 && p.rating < 1900);
+    else if (this.currentDifficulty === 'master') pool = allVerified.filter(p => p.rating >= 1900);
+
+    if (pool.length === 0) pool = allVerified;
+
+    if (typeof loadSeededPuzzle === 'function' && pool.length > 0) {
+      loadSeededPuzzle(pool, seed);
+      this.currentPuzzle = window.puzzleState?.currentPuzzle;
+      if (this.currentPuzzle) {
+        const ratingEl = document.getElementById('puzzle-rating');
+        if (ratingEl) ratingEl.textContent = `${this.currentPuzzle.rating} Rating`;
+        const themeContainer = document.getElementById('puzzle-themes');
+        if (themeContainer) {
+          const tags = (this.currentPuzzle.themes || 'tactics').split(' ').map(t => `<span class="puzzle-theme-tag">${t}</span>`).join('');
+          themeContainer.innerHTML = tags;
+        }
+      }
+      return;
+    }
 
     try {
       const data = await Api.get(`/puzzles/random?difficulty=${this.currentDifficulty}`);
@@ -107,6 +148,22 @@ const PuzzlesPage = {
         alert('No puzzles found in this difficulty bracket.');
         return;
       }
+      const sol = await Api.get(`/puzzles/${data.puzzle_id}/solution`);
+      const movesArr = sol.moves.split(' ');
+      const puzzleObj = {
+        id: data.puzzle_id,
+        fen: data.fen,
+        moves: movesArr,
+        rating: data.rating,
+        themes: data.themes
+      };
+      if (typeof loadSeededPuzzle === 'function') {
+        loadSeededPuzzle([puzzleObj], seed);
+      }
+    } catch (err) {
+      console.error('[Puzzles] Error loading puzzle:', err);
+    }
+  },
 
       this.currentPuzzle = data;
       document.getElementById('puzzle-rating').textContent = `${data.rating} Rating`;
@@ -286,19 +343,25 @@ const PuzzlesPage = {
 
   revealHint() {
     this.usedSolution = true;
-    const nextMove = this.solutionMoves[this.currentMoveIndex];
+    if (typeof requestPuzzleHint === 'function') {
+      requestPuzzleHint();
+      return;
+    }
+    const nextMove = this.solutionMoves?.[this.currentMoveIndex];
     if (nextMove) {
       const from = nextMove.substring(0, 2);
       const to = nextMove.substring(2, 4);
-      ChessBoard.highlightedSquares.set(from, 'yellow');
-      ChessBoard.highlightedSquares.set(to, 'green');
-      ChessBoard.render();
-      ChessBoard.bindEvents();
+      if (typeof drawMoveArrowFixed === 'function') {
+        drawMoveArrowFixed(from, to, '#3b82f6', true);
+      }
+      document.querySelector(`[data-square="${from}"]`)?.classList.add('highlight-analysis');
 
       const feedback = document.getElementById('puzzle-feedback');
-      feedback.className = 'puzzle-feedback glass-panel';
-      feedback.classList.remove('hidden');
-      feedback.textContent = `💡 Hint: Move from ${from.toUpperCase()} to ${to.toUpperCase()} (Solution used: No rating awarded)`;
+      if (feedback) {
+        feedback.className = 'puzzle-feedback glass-panel';
+        feedback.classList.remove('hidden');
+        feedback.textContent = `💡 Hint: Move from ${from.toUpperCase()} to ${to.toUpperCase()}`;
+      }
     }
   }
 };

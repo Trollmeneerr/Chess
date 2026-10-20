@@ -548,10 +548,37 @@ const AnalysisPage = {
     const inviteCode = this.currentGame?.invite_code || data.invite_code || 'N/A';
     const isCached = Boolean(data.cached);
 
-    // Pre-calculate FEN for each move step
+    // Pre-calculate FEN for each move step: fens[0] = initial board, fens[plyIndex] = board AFTER moves[plyIndex - 1]
+    const chess = (typeof window.Chess === 'function') ? new window.Chess() : null;
     this.fens = [AppConfig.INITIAL_FEN];
-    moves.forEach(m => {
-      this.fens.push(m.fen);
+    this.evaluations = [{ cp: 0, mate: null }];
+    this.moves = moves;
+
+    moves.forEach((m, idx) => {
+      const from = m.from || m.uci?.substring(0, 2);
+      const to = m.to || m.uci?.substring(2, 4);
+      const promotion = m.uci?.length > 4 ? m.uci[4] : undefined;
+      m.from = from;
+      m.to = to;
+      if (!m.bestAlternativeUci && m.bestMove) m.bestAlternativeUci = m.bestMove;
+
+      let postFen = m.fen;
+      if (chess) {
+        try {
+          if (m.san) {
+            chess.move(m.san);
+          } else {
+            chess.move({ from, to, promotion });
+          }
+          postFen = chess.fen();
+        } catch (e) {}
+      }
+      this.fens.push(postFen);
+
+      const cpVal = m.evalCp !== undefined
+        ? m.evalCp
+        : (m.eval !== undefined ? Math.round(m.eval * 100) : 0);
+      this.evaluations.push({ cp: cpVal, mate: m.mate || null });
     });
 
     workspace.innerHTML = `
@@ -657,13 +684,13 @@ const AnalysisPage = {
               </div>
             </div>
 
-            <a href="#review" onclick="switchMode('analysis')" class="btn-primary review-cta">
+            <a href="/analysis" data-action="game-review" onclick="if(typeof switchMode==='function')switchMode('analysis')" class="btn-primary review-cta">
               <strong>Game Review</strong>
               <span>See top 3 lines & best blue moves</span>
             </a>
 
             <div class="post-game-actions">
-              <button onclick="startNewGame()" class="btn-secondary">New Game</button>
+              <button data-action="play-online" onclick="startNewGame()" class="btn-secondary">New Game</button>
               <button onclick="requestRematch()" class="btn-secondary">Rematch</button>
             </div>
           </section>
@@ -723,7 +750,7 @@ const AnalysisPage = {
 
     this.renderMovesGrid(moves);
     this.bindAnalysisControls(moves);
-    this.jumpToMove(-1);
+    this.jumpToPly(0);
 
     // Header buttons
     document.getElementById('btn-back-to-selector')?.addEventListener('click', () => {
@@ -766,27 +793,31 @@ const AnalysisPage = {
       const wBadge = getMoveBadge(w);
       const bBadge = getMoveBadge(b);
 
+      // Spec Formula: plyIndex = (moveNumber - 1) * 2 + (isBlack ? 2 : 1)
+      const wPly = (moveNum - 1) * 2 + 1;
+      const bPly = (moveNum - 1) * 2 + 2;
+
       html += `
         <div class="move-number">${moveNum}.</div>
-        <div class="move-cell ${w?.classification || ''}" data-index="${i}">${w ? w.san + wBadge : ''}</div>
-        <div class="move-cell ${b?.classification || ''}" data-index="${i + 1}">${b ? b.san + bBadge : ''}</div>
+        <div class="move-cell ${w?.classification || ''}" data-ply="${wPly}">${w ? w.san + wBadge : ''}</div>
+        <div class="move-cell ${b?.classification || ''}" data-ply="${bPly}">${b ? b.san + bBadge : ''}</div>
       `;
     }
 
     container.innerHTML = html;
     container.querySelectorAll('.move-cell').forEach(cell => {
       cell.addEventListener('click', () => {
-        const idx = parseInt(cell.dataset.index);
-        if (!isNaN(idx)) this.jumpToMove(idx);
+        const ply = parseInt(cell.dataset.ply);
+        if (!isNaN(ply)) this.jumpToPly(ply);
       });
     });
   },
 
   bindAnalysisControls(moves) {
-    document.getElementById('btn-step-start')?.addEventListener('click', () => this.jumpToMove(-1));
-    document.getElementById('btn-step-prev')?.addEventListener('click', () => this.jumpToMove(Math.max(-1, this.currentMoveIndex - 1)));
-    document.getElementById('btn-step-next')?.addEventListener('click', () => this.jumpToMove(Math.min(moves.length - 1, this.currentMoveIndex + 1)));
-    document.getElementById('btn-step-end')?.addEventListener('click', () => this.jumpToMove(moves.length - 1));
+    document.getElementById('btn-step-start')?.addEventListener('click', () => this.jumpToPly(0));
+    document.getElementById('btn-step-prev')?.addEventListener('click', () => this.jumpToPly(Math.max(0, this.currentPlyIndex - 1)));
+    document.getElementById('btn-step-next')?.addEventListener('click', () => this.jumpToPly(Math.min(this.moves.length, this.currentPlyIndex + 1)));
+    document.getElementById('btn-step-end')?.addEventListener('click', () => this.jumpToPly(this.moves.length));
     document.getElementById('btn-flip')?.addEventListener('click', () => ChessBoard.flip());
 
     // Keyboard navigation (Left / Right arrow keys)
@@ -794,114 +825,61 @@ const AnalysisPage = {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        this.jumpToMove(Math.max(-1, this.currentMoveIndex - 1));
+        this.jumpToPly(Math.max(0, this.currentPlyIndex - 1));
       }
       if (e.key === 'ArrowRight') {
         e.preventDefault();
-        this.jumpToMove(Math.min(moves.length - 1, this.currentMoveIndex + 1));
+        this.jumpToPly(Math.min(this.moves.length, this.currentPlyIndex + 1));
       }
     };
   },
 
-  jumpToMove(index) {
-    this.currentMoveIndex = index;
-    const moves = this.currentAnalysis?.moves || [];
+  jumpToPly(plyIndex) {
+    this.currentPlyIndex = plyIndex;
+    this.currentMoveIndex = plyIndex - 1;
 
-    // Highlight active cell in move list
+    // 1. Synchronize Board, Eval Bar, Audio, Highlights & Worker MultiPV
+    if (typeof syncAnalysisToPly === 'function') {
+      syncAnalysisToPly(plyIndex, this.fens, this.moves, this.evaluations);
+    } else {
+      renderBoardFromFen(this.fens[plyIndex]);
+    }
+
+    // 2. Highlight active cell in move list
     document.querySelectorAll('#analysis-moves-grid .move-cell').forEach(c => {
-      const cIdx = parseInt(c.dataset.index);
-      c.classList.toggle('active', cIdx === index);
+      const cPly = parseInt(c.dataset.ply);
+      c.classList.toggle('active', cPly === plyIndex);
     });
 
     const indicator = document.getElementById('step-indicator');
     const retryBanner = document.getElementById('retry-banner');
 
-    if (index === -1) {
-      ChessBoard.update(AppConfig.INITIAL_FEN, { lastMove: null });
-      if (typeof resetBoardVisualState === 'function') resetBoardVisualState();
+    if (plyIndex === 0) {
       if (indicator) indicator.textContent = 'Initial Position';
       if (retryBanner) retryBanner.classList.add('hidden');
-      this.updateEvalBar(0);
-      if (typeof updateEvaluationBar === 'function') updateEvaluationBar(0, null);
-      if (typeof playChessSound === 'function') playChessSound('move');
-      if (typeof evaluatePositionWithWorker === 'function') evaluatePositionWithWorker(AppConfig.INITIAL_FEN);
       return;
     }
 
-    const currentMove = moves[index];
-    if (!currentMove) return;
+    // 3. Move indicator: Full-move number = Math.ceil(plyIndex / 2)
+    const moveNumber = Math.ceil(plyIndex / 2);
+    const isBlack = (plyIndex % 2 === 0);
+    const playedMove = this.moves[plyIndex - 1];
 
-    // Board position
-    const fen = currentMove.fen;
-    const from = currentMove.from || currentMove.uci.substring(0, 2);
-    const to = currentMove.to || currentMove.uci.substring(2, 4);
-
-    ChessBoard.update(fen, {
-      lastMove: { from, to }
-    });
-
-    // Wipe leftover classes and apply highlights to moveHistory[currentMoveIndex].from and to (the move just played, not currentMoveIndex - 1)
-    if (typeof resetBoardVisualState === 'function') {
-      resetBoardVisualState();
-    }
-    document.querySelector(`[data-square="${from}"]`)?.classList.add('highlight-analysis');
-    document.querySelector(`[data-square="${to}"]`)?.classList.add('highlight-analysis');
-
-    // Trigger wooden sound synthesizer
-    if (typeof playChessSound === 'function') {
-      if (currentMove.inCheck || currentMove.san?.includes('+') || currentMove.san?.includes('#')) {
-        playChessSound('check');
-      } else if (currentMove.captured || currentMove.san?.includes('x')) {
-        playChessSound('capture');
-      } else if (currentMove.san === 'O-O' || currentMove.san === 'O-O-O') {
-        playChessSound('castle');
-      } else {
-        playChessSound('move');
-      }
+    if (indicator && playedMove) {
+      indicator.textContent = `Move ${moveNumber}${isBlack ? '... ' : '. '}${playedMove.san} (${playedMove.badge || ''})`;
     }
 
-    let bestFrom = null;
-    let bestTo = null;
-    if (currentMove.bestMove && currentMove.bestMove.length >= 4) {
-      bestFrom = currentMove.bestMove.substring(0, 2);
-      bestTo = currentMove.bestMove.substring(2, 4);
-    }
-
-    // Always render engine's best move using a solid Blue arrow (#3b82f6)
-    if (['inaccuracy', 'mistake', 'blunder'].includes(currentMove.classification) && bestFrom && bestTo) {
-      if (typeof drawMoveArrowFixed === 'function') {
-        drawMoveArrowFixed(bestFrom, bestTo, '#3b82f6', true);
-      } else if (typeof drawMoveArrow === 'function') {
-        drawMoveArrow(bestFrom, bestTo, '#3b82f6', true);
-      }
-    }
-
-    if (indicator) {
-      indicator.textContent = `Move ${currentMove.moveNumber}: ${currentMove.san} (${currentMove.badge || ''})`;
-    }
-
-    const evalCp = currentMove.evalCp !== undefined
-      ? currentMove.evalCp
-      : (currentMove.eval !== undefined ? Math.round(currentMove.eval * 100) : 0);
-    this.updateEvalBar(currentMove.eval || 0);
-    if (typeof updateEvaluationBar === 'function') {
-      updateEvaluationBar(evalCp, currentMove.mate);
-    }
-
-    // Stream Top 3 lines for this position using Stockfish WebWorker hook
-    if (fen && typeof evaluatePositionWithWorker === 'function') {
-      evaluatePositionWithWorker(fen);
-    }
-
-    // Show Retry Mistake banner if move was mistake, blunder, or inaccuracy
-    if (['blunder', 'mistake', 'inaccuracy'].includes(currentMove.classification)) {
+    // 4. Retry Mistake banner if playedMove was mistake, blunder, or inaccuracy
+    const misplayTypes = (typeof MISPLAY_TYPES !== 'undefined') ? MISPLAY_TYPES : new Set(['blunder', 'mistake', 'inaccuracy']);
+    if (playedMove && misplayTypes.has(playedMove.classification)) {
       if (retryBanner) {
         retryBanner.classList.remove('hidden');
-        document.getElementById('retry-badge-type').textContent = currentMove.classification.toUpperCase();
-        document.getElementById('retry-text').textContent = `Played ${currentMove.san}. Stockfish prefers ${currentMove.bestMove || 'another move'}.`;
+        document.getElementById('retry-badge-type').textContent = playedMove.classification.toUpperCase();
+        const altMove = playedMove.bestAlternativeUci || playedMove.bestMove || 'another move';
+        document.getElementById('retry-text').textContent = `Played ${playedMove.san}. Stockfish prefers ${altMove}.`;
 
         document.getElementById('btn-retry-mistake').onclick = () => {
-          this.retryMistake(index);
+          this.retryMistake(plyIndex - 1);
         };
       }
     } else {
@@ -909,31 +887,38 @@ const AnalysisPage = {
     }
   },
 
+  jumpToMove(index) {
+    // Backwards-compatible bridge: index -1 -> ply 0; index 0 -> ply 1
+    this.jumpToPly(index + 1);
+  },
+
   retryMistake(index) {
-    const moves = this.currentAnalysis?.moves || [];
+    const moves = this.moves || this.currentAnalysis?.moves || [];
     const move = moves[index];
     if (!move) return;
 
-    const prevFen = index === 0 ? AppConfig.INITIAL_FEN : moves[index - 1].fen;
+    // FEN before the mistake was made is fens[index]
+    const preFen = (this.fens && this.fens[index]) ? this.fens[index] : AppConfig.INITIAL_FEN;
     const turn = index % 2 === 0 ? 'white' : 'black';
+    const expectedBest = move.bestAlternativeUci || move.bestMove;
 
     ChessBoard.init('board-container', {
       orientation: turn,
-      fen: prevFen,
+      fen: preFen,
       interactive: true,
       onMove: (attempt) => {
         const attemptUci = attempt.from + attempt.to + (attempt.promotion || '');
-        if (attemptUci === move.bestMove) {
+        if (expectedBest && (attemptUci === expectedBest || attemptUci === expectedBest.slice(0, 4))) {
           alert('★ Excellent! You found the engine\'s best move!');
-          this.jumpToMove(index);
+          this.jumpToPly(index + 1);
         } else {
-          alert(`Not quite the best move. Stockfish recommended: ${move.bestMove}`);
-          this.jumpToMove(index);
+          alert(`Not quite the best move. Stockfish recommended: ${expectedBest || 'a better line'}`);
+          this.jumpToPly(index + 1);
         }
       }
     });
 
-    alert(`Retrying Move ${move.moveNumber}. Find a better move than ${move.san}!`);
+    alert(`Retrying Move ${Math.ceil((index + 1) / 2)}. Find a better move than ${move.san}!`);
   },
 
   updateEvalBar(ev) {

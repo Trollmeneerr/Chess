@@ -119,9 +119,22 @@ router.post('/:puzzleId/attempt', authMiddleware, async (req, res) => {
       );
     }
 
-    // Award ELO if solved without using solution
+    // Award ELO based on reward system (+1 on perfect solve, 0 on 1 mistake/hint, -1 on 2+ mistakes/hints)
     let eloChange = 0;
-    if (solved && !used_solution && (!existing || !existing.solved)) {
+    if (req.body.reward !== undefined) {
+      eloChange = parseInt(req.body.reward) || 0;
+      if (solved && eloChange >= 0) {
+        await db.run(
+          'UPDATE users SET elo_rating = MAX(0, elo_rating + ?), puzzles_solved = puzzles_solved + 1 WHERE id = ?',
+          [eloChange, req.user.id]
+        );
+      } else {
+        await db.run(
+          'UPDATE users SET elo_rating = MAX(0, elo_rating + ?) WHERE id = ?',
+          [eloChange, req.user.id]
+        );
+      }
+    } else if (solved && !used_solution && (!existing || !existing.solved)) {
       eloChange = PUZZLE_ELO_REWARD;
       await db.run(
         'UPDATE users SET elo_rating = elo_rating + ?, puzzles_solved = puzzles_solved + 1 WHERE id = ?',

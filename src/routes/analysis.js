@@ -276,9 +276,13 @@ router.post('/game', optionalAuth, async (req, res) => {
           moveNumber: Math.floor(i / 2) + 1,
           san: move.san,
           uci: move.from + move.to + (move.promotion || ''),
-          fen: fen,
+          from: move.from,
+          to: move.to,
+          fen: evalChess.fen(), // board state AFTER move
+          preFen: fen,         // board state BEFORE move
           eval: currentEval,
           bestMove: evalResult.bestmove,
+          bestAlternativeUci: evalResult.bestmove,
           classification,
           badge,
           evalChange: Math.round(evalChange * 100) / 100

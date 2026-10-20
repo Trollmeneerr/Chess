@@ -2017,6 +2017,91 @@
   letter-spacing: 0.05em;
 }
 
+/* --- Puzzle Controls Bar & Reward Badges --- */
+.puzzle-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(14, 23, 42, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: var(--radius-md);
+  margin-bottom: 12px;
+}
 
+.btn-blue-sm {
+  background: var(--blue, #3b82f6);
+  color: #fff;
+  border: 1px solid rgba(59, 130, 246, 0.8);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 
+.btn-blue-sm:hover {
+  background: #2563eb;
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.5);
+  transform: translateY(-1px);
+}
 
+#puzzle-reward-badge {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  transition: all 0.2s ease;
+}
+
+/* Button aliases for spec buttons */
+.btn-primary {
+  background: var(--accent, #38bdf8);
+  color: #060913;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: var(--radius-md, 8px);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary:hover {
+  opacity: 0.92;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.4);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary, #f1f5f9);
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: var(--radius-md, 8px);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Profile Settings Timezone Card */
+.profile-settings-card {
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  border-radius: var(--radius-lg, 12px);
+}

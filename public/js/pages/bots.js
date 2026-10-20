@@ -163,6 +163,13 @@ const BotsPage = {
       modal.classList.add('hidden');
     });
 
+    // Guest sign-in link
+    document.getElementById('modal-link-signin')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      modal.classList.add('hidden');
+      if (window.Auth) window.Auth.showLoginModal();
+    });
+
     modal.onclick = (e) => {
       if (e.target === modal) modal.classList.add('hidden');
     };
@@ -282,13 +289,13 @@ const BotsPage = {
                 </div>
               </div>
 
-              <a href="#review" onclick="switchMode('analysis')" class="btn-primary review-cta">
+              <a href="/analysis" data-action="game-review" onclick="if(typeof switchMode==='function')switchMode('analysis')" class="btn-primary review-cta">
                 <strong>Game Review</strong>
                 <span>See top 3 lines & best blue moves</span>
               </a>
 
               <div class="post-game-actions">
-                <button onclick="startNewGame()" class="btn-secondary">New Game</button>
+                <button data-action="play-bots" onclick="startNewGame()" class="btn-secondary">New Game</button>
                 <button onclick="requestRematch()" class="btn-secondary">Rematch</button>
               </div>
             </section>

@@ -11,7 +11,7 @@ const { getBotByElo } = require('../engine/bots');
 router.get('/profile/:username', optionalAuth, async (req, res) => {
   try {
     const user = await db.get(
-      'SELECT id, username, avatar_id, avatar_custom, elo_rating, puzzles_solved, bots_defeated, created_at FROM users WHERE username = ?',
+      'SELECT id, username, avatar_id, avatar_custom, timezone_id, elo_rating, puzzles_solved, bots_defeated, created_at FROM users WHERE username = ?',
       [req.params.username]
     );
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -169,13 +169,34 @@ router.post('/avatar', authMiddleware, async (req, res) => {
     }
 
     const updated = await db.get(
-      'SELECT id, username, avatar_id, avatar_custom, elo_rating, puzzles_solved, bots_defeated FROM users WHERE id = ?',
+      'SELECT id, username, avatar_id, avatar_custom, timezone_id, elo_rating, puzzles_solved, bots_defeated FROM users WHERE id = ?',
       [userId]
     );
     res.json({ success: true, user: updated });
   } catch (err) {
     console.error('[Users] Update avatar error:', err);
     res.status(500).json({ error: 'Failed to update avatar' });
+  }
+});
+
+// POST /api/users/timezone — Update user timezone
+router.post('/timezone', authMiddleware, async (req, res) => {
+  try {
+    const { timezone_id } = req.body;
+    if (!timezone_id || typeof timezone_id !== 'string') {
+      return res.status(400).json({ error: 'timezone_id is required' });
+    }
+    const cleanTz = timezone_id.trim();
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: cleanTz });
+    } catch (e) {
+      return res.status(400).json({ error: 'Invalid IANA timezone identifier' });
+    }
+    await db.run('UPDATE users SET timezone_id = ? WHERE id = ?', [cleanTz, req.user.id]);
+    res.json({ success: true, timezone_id: cleanTz });
+  } catch (err) {
+    console.error('[Users] Error updating timezone:', err);
+    res.status(500).json({ error: 'Failed to update timezone' });
   }
 });
 

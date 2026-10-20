@@ -107,6 +107,10 @@ const Auth = {
           <input type="password" class="form-input" id="reg-password" placeholder="Min 6 characters" required minlength="6" autocomplete="new-password">
         </div>
         <div class="form-group">
+          <label class="form-label" for="reg-timezone">Timezone</label>
+          <select id="reg-timezone" class="form-input" name="timezone_id"></select>
+        </div>
+        <div class="form-group">
           <label class="form-label">Choose Avatar</label>
           <div class="avatar-grid" id="avatar-grid">
             ${avatarHTML}
@@ -121,6 +125,11 @@ const Auth = {
       </form>
     `;
     document.getElementById('auth-modal').classList.remove('hidden');
+
+    // Populate detected IANA timezone
+    if (typeof populateTimezoneSelect === 'function') {
+      populateTimezoneSelect('reg-timezone');
+    }
 
     // Avatar selection
     document.querySelectorAll('.avatar-option').forEach(el => {
@@ -163,10 +172,11 @@ const Auth = {
     const username = document.getElementById('reg-username').value.trim();
     const password = document.getElementById('reg-password').value;
     const avatar_id = parseInt(document.getElementById('reg-avatar').value);
+    const timezone_id = document.getElementById('reg-timezone')?.value || 'UTC';
     const errorEl = document.getElementById('reg-error');
 
     try {
-      const data = await Api.post('/auth/register', { username, password, avatar_id });
+      const data = await Api.post('/auth/register', { username, password, avatar_id, timezone_id });
       Api.setToken(data.token);
       this.currentUser = data.user;
       this.updateUI();

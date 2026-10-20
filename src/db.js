@@ -14,6 +14,7 @@ const SCHEMA = {
       username VARCHAR(20) NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       avatar_id INTEGER DEFAULT 1,
+      timezone_id VARCHAR(50) DEFAULT 'UTC',
       elo_rating INTEGER DEFAULT 800,
       puzzles_solved INTEGER DEFAULT 0,
       bots_defeated INTEGER DEFAULT 0,
@@ -26,6 +27,7 @@ const SCHEMA = {
       username VARCHAR(20) NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       avatar_id INT DEFAULT 1,
+      timezone_id VARCHAR(50) DEFAULT 'UTC',
       elo_rating INT DEFAULT 800,
       puzzles_solved INT DEFAULT 0,
       bots_defeated INT DEFAULT 0,
@@ -294,6 +296,17 @@ async function runMigrations() {
       } catch (e) {
         console.warn('[DB] Migration note (users.avatar_custom):', e.message);
       }
+
+      // 4. Check users table for timezone_id column
+      try {
+        const [cols] = await db.query("SHOW COLUMNS FROM users LIKE 'timezone_id'");
+        if (!cols || cols.length === 0) {
+          console.log('[DB] Running migration: Adding timezone_id column to MySQL users table...');
+          await db.query("ALTER TABLE users ADD COLUMN timezone_id VARCHAR(50) DEFAULT 'UTC'");
+        }
+      } catch (e) {
+        console.warn('[DB] Migration note (users.timezone_id):', e.message);
+      }
     } else {
       // SQLite migrations
       try {
@@ -319,8 +332,13 @@ async function runMigrations() {
           console.log('[DB] Running migration: Adding avatar_custom column to SQLite users table...');
           db.exec('ALTER TABLE users ADD COLUMN avatar_custom TEXT');
         }
+        const hasTimezone = pragma.some(col => col.name === 'timezone_id');
+        if (!hasTimezone) {
+          console.log('[DB] Running migration: Adding timezone_id column to SQLite users table...');
+          db.exec("ALTER TABLE users ADD COLUMN timezone_id TEXT DEFAULT 'UTC'");
+        }
       } catch (e) {
-        console.warn('[DB] SQLite migration note (users.avatar):', e.message);
+        console.warn('[DB] SQLite migration note (users.timezone_id):', e.message);
       }
     }
     console.log('[DB] Schema and migration checks complete');

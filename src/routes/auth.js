@@ -41,12 +41,13 @@ router.post('/register', async (req, res) => {
 
     // Insert user
     const avatarId = parseInt(avatar_id) || Math.floor(Math.random() * 16) + 1;
+    const tzId = (timezone_id && typeof timezone_id === 'string' && timezone_id.trim()) ? timezone_id.trim() : 'UTC';
     const result = await db.insert(
-      'INSERT INTO users (username, password_hash, avatar_id) VALUES (?, ?, ?)',
-      [username, password_hash, avatarId]
+      'INSERT INTO users (username, password_hash, avatar_id, timezone_id) VALUES (?, ?, ?, ?)',
+      [username, password_hash, avatarId, tzId]
     );
 
-    const user = { id: result.lastInsertRowid, username, avatar_id: avatarId };
+    const user = { id: result.lastInsertRowid, username, avatar_id: avatarId, timezone_id: tzId };
     const token = generateToken(user);
 
     res.cookie('token', token, {
@@ -57,7 +58,7 @@ router.post('/register', async (req, res) => {
     });
 
     res.json({
-      user: { id: user.id, username, avatar_id: avatarId, elo_rating: 800 },
+      user: { id: user.id, username, avatar_id: avatarId, timezone_id: tzId, elo_rating: 800 },
       token
     });
   } catch (err) {
@@ -99,6 +100,8 @@ router.post('/login', async (req, res) => {
         id: user.id,
         username: user.username,
         avatar_id: user.avatar_id,
+        avatar_custom: user.avatar_custom,
+        timezone_id: user.timezone_id || 'UTC',
         elo_rating: user.elo_rating,
         puzzles_solved: user.puzzles_solved,
         bots_defeated: user.bots_defeated
@@ -121,7 +124,7 @@ router.post('/logout', (req, res) => {
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     const user = await db.get(
-      'SELECT id, username, avatar_id, elo_rating, puzzles_solved, bots_defeated, created_at FROM users WHERE id = ?',
+      'SELECT id, username, avatar_id, avatar_custom, timezone_id, elo_rating, puzzles_solved, bots_defeated, created_at FROM users WHERE id = ?',
       [req.user.id]
     );
     if (!user) return res.status(404).json({ error: 'User not found' });

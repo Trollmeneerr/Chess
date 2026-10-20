@@ -201,6 +201,25 @@ const ProfilePage = {
               ${this.renderMatchesList(recent, 'all')}
             </div>
           </div>
+
+          ${isSelf ? `
+            <!-- Signup / Profile Settings Timezone Dropdown -->
+            <div class="glass-panel profile-settings-card mt-3" style="padding:18px;">
+              <div class="settings-header">
+                <h3 style="font-size:15px;margin:0 0 4px 0;display:flex;align-items:center;gap:8px;">
+                  <span>⚙️ Profile Settings</span>
+                  <span class="badge badge-accent">Timezone & Preferences</span>
+                </h3>
+                <p style="font-size:12px;color:var(--text-secondary);margin:0 0 14px 0;">
+                  Your IANA timezone is auto-detected. All match timestamps are formatted in your local time.
+                </p>
+              </div>
+              <div class="form-group" style="max-width:360px;">
+                <label for="user-timezone" style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">Timezone</label>
+                <select id="user-timezone" name="timezone_id" class="form-input" onchange="saveUserTimezone(this.value)"></select>
+              </div>
+            </div>
+          ` : ''}
         </div>
       </div>
     `;
@@ -208,6 +227,11 @@ const ProfilePage = {
     // Render Friends Widget on profile view
     if (window.FriendsWidget) {
       window.FriendsWidget.render('profile-friends-widget-wrap');
+    }
+
+    // Populate timezone selector in profile settings
+    if (isSelf && typeof populateTimezoneSelect === 'function') {
+      populateTimezoneSelect('user-timezone', user.timezone_id);
     }
 
     // Filter pill listeners
@@ -292,7 +316,11 @@ const ProfilePage = {
       const pieceSvg = `<span style="display:inline-block;width:14px;height:14px;vertical-align:middle;margin-right:2px;">${AppConfig.getPiece(g.user_color === 'white' ? 'K' : 'k')}</span>`;
       const userColorIcon = `${pieceSvg} ${g.user_color === 'white' ? 'White' : 'Black'}`;
 
+      const userTimezoneId = this.profileUser?.timezone_id || window.Auth?.currentUser?.timezone_id || 'UTC';
       const timeAgo = this.formatTimeAgo(g.created_at);
+      const formattedDate = (typeof formatTimestampForUser === 'function')
+        ? formatTimestampForUser(g.created_at, userTimezoneId)
+        : timeAgo;
       const tcLabel = this.formatTimeControl(g.time_control);
 
       rowsHtml += `
@@ -321,7 +349,7 @@ const ProfilePage = {
           <!-- Moves & Date -->
           <div class="match-meta-col">
             <span class="match-move-count">${g.move_count || '?'} moves</span>
-            <span class="match-date">${timeAgo}</span>
+            <span class="match-date" title="${timeAgo}">${formattedDate}</span>
           </div>
 
           <!-- Action Buttons -->

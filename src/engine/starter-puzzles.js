@@ -33,15 +33,15 @@ const STARTER_PUZZLES = [
   },
   {
     puzzle_id: 'ez_004',
-    fen: 'rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2',
-    moves: 'd7d5 d1e2 d8h4',
+    fen: 'rnbqkbnr/pppp1ppp/8/4p3/8/5P2/PPPPP1PP/RNBQKBNR w KQkq - 0 2',
+    moves: 'g2g4 d8h4',
     rating: 720,
     themes: 'mate mateIn1 foolsMate'
   },
   {
     puzzle_id: 'ez_005',
-    fen: 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4',
-    moves: 'h5f7',
+    fen: 'r1bqkb1r/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 3 3',
+    moves: 'g8f6 h5f7',
     rating: 750,
     themes: 'mate mateIn1 scholarsMate'
   },

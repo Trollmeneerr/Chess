@@ -46,19 +46,19 @@
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
           <span>Home</span>
         </a>
-        <a href="/play" class="nav-item" data-page="play" id="nav-play">
+        <a href="/play" class="nav-item" data-page="play" data-action="play-online" id="nav-play">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"/></svg>
           <span>Play</span>
         </a>
-        <a href="/bots" class="nav-item" data-page="bots" id="nav-bots">
+        <a href="/bots" class="nav-item" data-page="bots" data-action="play-bots" id="nav-bots">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
           <span>Bots</span>
         </a>
-        <a href="/puzzles" class="nav-item" data-page="puzzles" id="nav-puzzles">
+        <a href="/puzzles" class="nav-item" data-page="puzzles" data-action="open-puzzles" id="nav-puzzles">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM4 11a1 1 0 100-2H3a1 1 0 000 2h1zM10 18a1 1 0 001-1v-1a1 1 0 10-2 0v1a1 1 0 001 1z"/><circle cx="10" cy="10" r="3"/></svg>
           <span>Puzzles</span>
         </a>
-        <a href="/analysis" class="nav-item" data-page="analysis" id="nav-analysis">
+        <a href="/analysis" class="nav-item" data-page="analysis" data-action="game-review" id="nav-analysis">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
           <span>Review</span>
         </a>
@@ -66,7 +66,7 @@
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
           <span>Ranks</span>
         </a>
-        <a href="/profile" class="nav-item" data-page="profile" id="nav-profile">
+        <a href="/profile" class="nav-item" data-page="profile" data-action="open-profile" id="nav-profile">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
           <span>Profile</span>
         </a>
@@ -201,6 +201,7 @@
   <script src="/js/audio.js"></script>
   <script src="/js/board.js"></script>
   <script src="/js/analysis-and-fixes.js"></script>
+  <script src="/js/fixes-and-puzzles.js"></script>
   <script src="/js/friends.js"></script>
   <script src="/js/pages/lobby.js"></script>
   <script src="/js/pages/play.js"></script>

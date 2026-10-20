@@ -74,15 +74,15 @@ const LobbyPage = {
               </div>
 
               <div class="hero-actions mt-2 mb-1">
-                <a href="/play" class="btn btn-fill btn-lg hero-action-btn" id="btn-hero-play">
+                <a href="/play" data-action="play-online" class="btn btn-fill btn-lg hero-action-btn" id="btn-hero-play">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                   <span>Play Online</span>
                 </a>
-                <a href="/bots" class="btn btn-outline btn-lg hero-action-btn" id="btn-hero-bots">
+                <a href="/bots" data-action="play-bots" class="btn btn-outline btn-lg hero-action-btn" id="btn-hero-bots">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" y1="16" x2="8.01" y2="16"></line><line x1="16" y1="16" x2="16.01" y2="16"></line></svg>
                   <span>Play Computer</span>
                 </a>
-                <a href="/puzzles" class="btn btn-ghost btn-lg hero-action-btn" id="btn-hero-puzzles">
+                <a href="/puzzles" data-action="open-puzzles" class="btn btn-ghost btn-lg hero-action-btn" id="btn-hero-puzzles">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572"></path></svg>
                   <span>Solve Puzzles</span>
                 </a>
@@ -94,7 +94,7 @@ const LobbyPage = {
             <!-- Chess.com Style Game Tiles Grid -->
             <div class="lobby-grid">
               <!-- Card: Play Online -->
-              <a href="/play" class="lobby-card glass-panel glass-panel-hover" id="card-pvp" style="text-decoration:none;">
+              <a href="/play" data-action="play-online" class="lobby-card glass-panel glass-panel-hover" id="card-pvp" style="text-decoration:none;">
                 <div class="card-icon-wrap">
                   <div class="lobby-vector-icon icon-cyan">
                     <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -116,7 +116,7 @@ const LobbyPage = {
               </a>
 
               <!-- Card: Play Bots -->
-              <a href="/bots" class="lobby-card glass-panel glass-panel-hover" id="card-bots" style="text-decoration:none;">
+              <a href="/bots" data-action="play-bots" class="lobby-card glass-panel glass-panel-hover" id="card-bots" style="text-decoration:none;">
                 <div class="card-icon-wrap">
                   <div class="lobby-vector-icon icon-warning">
                     <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -139,7 +139,7 @@ const LobbyPage = {
               </a>
 
               <!-- Card: Tactical Puzzles -->
-              <a href="/puzzles" class="lobby-card glass-panel glass-panel-hover" id="card-puzzles" style="text-decoration:none;">
+              <a href="/puzzles" data-action="open-puzzles" class="lobby-card glass-panel glass-panel-hover" id="card-puzzles" style="text-decoration:none;">
                 <div class="card-icon-wrap">
                   <div class="lobby-vector-icon icon-success">
                     <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -158,7 +158,7 @@ const LobbyPage = {
               </a>
 
               <!-- Card: Game Review -->
-              <a href="/analysis" class="lobby-card glass-panel glass-panel-hover" id="card-analysis" style="text-decoration:none;">
+              <a href="/analysis" data-action="game-review" class="lobby-card glass-panel glass-panel-hover" id="card-analysis" style="text-decoration:none;">
                 <div class="card-icon-wrap">
                   <div class="lobby-vector-icon icon-cyan">
                     <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
