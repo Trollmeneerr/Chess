@@ -31,7 +31,13 @@ const PuzzlesPage = {
 
           <!-- Board Area -->
           <div class="board-wrapper">
-            <div id="board-container"></div>
+            <div class="board-middle-row" style="display:flex;flex-direction:row;align-items:stretch;justify-content:center;position:relative;">
+              <div id="eval-bar" class="eval-bar hidden">
+                <div id="eval-fill" class="eval-fill" style="height: 50%;"></div>
+                <span id="eval-score" class="eval-score">0.0</span>
+              </div>
+              <div id="board-container"></div>
+            </div>
           </div>
 
           <!-- Puzzle Sidebar -->

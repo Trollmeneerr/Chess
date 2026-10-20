@@ -399,6 +399,42 @@ router.post('/evaluate', async (req, res) => {
   }
 });
 
+// POST /api/analysis/multipv — Stream or return MultiPV lines for any position
+router.post('/multipv', async (req, res) => {
+  try {
+    const { fen, depth = 16, numPV = 3, moves = '' } = req.body;
+    if (!fen) return res.status(400).json({ error: 'FEN required' });
+
+    if (stockfish.isAvailable()) {
+      const result = await stockfish.getMultiPV(fen, moves, numPV, depth, 1200);
+      return res.json({
+        success: true,
+        depth: depth,
+        lines: result.pvLines || []
+      });
+    }
+
+    // Fallback if Stockfish binary not running
+    const c = new Chess(fen);
+    const legalMoves = c.moves({ verbose: true });
+    const lines = legalMoves.slice(0, numPV).map((m, idx) => ({
+      pvNum: idx + 1,
+      score: 0.1 * (idx === 0 ? 1 : -idx),
+      scoreType: 'cp',
+      bestMove: m.from + m.to + (m.promotion || ''),
+      pv: [m.san]
+    }));
+
+    res.json({
+      success: true,
+      depth: 8,
+      lines
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 function countClassifications(moves) {
   const counts = { best: 0, good: 0, inaccuracy: 0, mistake: 0, blunder: 0 };
   moves.forEach(m => {

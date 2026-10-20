@@ -117,6 +117,11 @@ const App = {
   renderPage(page, params = null) {
     this.currentPage = page;
 
+    // Wipe leftover classes (.highlight-analysis, .highlight-premove, .in-check, .last-move) and SVG arrows
+    if (typeof resetBoardVisualState === 'function') {
+      resetBoardVisualState();
+    }
+
     // Update active nav button
     document.querySelectorAll('.nav-item').forEach(item => {
       const p = item.dataset.page;

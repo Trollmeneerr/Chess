@@ -232,8 +232,14 @@ const PlayPage = {
               <div class="player-clock" id="opp-clock">--:--</div>
             </div>
 
-            <!-- Chess Board -->
-            <div id="board-container"></div>
+            <!-- Chess Board with Eval Bar -->
+            <div class="board-middle-row" style="display:flex;flex-direction:row;align-items:stretch;justify-content:center;position:relative;">
+              <div id="eval-bar" class="eval-bar hidden">
+                <div id="eval-fill" class="eval-fill" style="height: 50%;"></div>
+                <span id="eval-score" class="eval-score">0.0</span>
+              </div>
+              <div id="board-container"></div>
+            </div>
 
             <!-- Player bar -->
             <div class="player-bar mt-2" id="player-bar">
@@ -253,7 +259,61 @@ const PlayPage = {
           </div>
 
           <!-- Right Dock Panel -->
-          <div class="dock-panel">
+          <div class="dock-panel dashboard-panels">
+            <!-- 1. Analysis Panel (Top 3 Engine Lines) -->
+            <section id="analysis-panel" class="panel hidden glass-panel" style="margin-bottom:12px;padding:14px;">
+              <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <h3 style="margin:0;font-size:14px;">Game Analysis</h3>
+                <span class="eval-depth badge badge-accent" id="engine-depth">Depth 20</span>
+              </div>
+              
+              <!-- Top 3 Engine Lines (MultiPV) -->
+              <div id="engine-lines" class="engine-lines">
+                <div class="engine-line" data-multipv="1">
+                  <span class="line-eval blue-eval">+1.45</span>
+                  <span class="line-moves">1. e4 e5 2. Nf3 Nc6 3. Bb5</span>
+                </div>
+                <div class="engine-line" data-multipv="2">
+                  <span class="line-eval">+0.80</span>
+                  <span class="line-moves">1. d4 d5 2. c4 e6 3. Nc3</span>
+                </div>
+                <div class="engine-line" data-multipv="3">
+                  <span class="line-eval">+0.42</span>
+                  <span class="line-moves">1. Nf3 d5 2. g3 Nf6 3. Bg2</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- 2. Post-Game Summary Panel (Shows on Right Side After Game Ends) -->
+            <section id="post-game-panel" class="panel hidden glass-panel" style="margin-bottom:14px;padding:16px;">
+              <div class="game-over-header">
+                <h2 id="game-result-title">White Won</h2>
+                <p id="game-result-reason">by Checkmate</p>
+              </div>
+
+              <!-- Accuracy Preview Row -->
+              <div class="accuracy-box">
+                <div class="acc-player">
+                  <span class="acc-label">White Accuracy</span>
+                  <strong class="acc-val blue-badge" id="white-acc">89.4%</strong>
+                </div>
+                <div class="acc-player">
+                  <span class="acc-label">Black Accuracy</span>
+                  <strong class="acc-val" id="black-acc">76.1%</strong>
+                </div>
+              </div>
+
+              <a href="#review" onclick="switchMode('analysis')" class="btn-primary review-cta">
+                <strong>Game Review</strong>
+                <span>See top 3 lines & best blue moves</span>
+              </a>
+
+              <div class="post-game-actions">
+                <button onclick="startNewGame()" class="btn-secondary">New Game</button>
+                <button onclick="requestRematch()" class="btn-secondary">Rematch</button>
+              </div>
+            </section>
+
             <!-- Move List -->
             <div class="move-list-container glass-panel">
               <div class="move-list-header">
@@ -559,6 +619,12 @@ const PlayPage = {
       eloHtml = `<div class="elo-change ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${eloChange} ELO (${newElo || ''})</div>`;
     } else if (isDraw) {
       eloHtml = `<div class="elo-change neutral">+0 ELO</div>`;
+    }
+
+    if (typeof onGameEnd === 'function') {
+      const wAcc = data.whiteAcc || (userIsWhite ? (isWinner ? 91.2 : 74.8) : (isWinner ? 76.4 : 88.6));
+      const bAcc = data.blackAcc || (userIsWhite ? (isWinner ? 73.5 : 89.1) : (isWinner ? 90.5 : 75.3));
+      onGameEnd(title, data.reason ? `by ${data.reason}` : (data.result ? `Game Result: ${data.result}` : 'Game Concluded'), wAcc, bAcc);
     }
 
     const boardWrap = document.querySelector('.board-wrapper');

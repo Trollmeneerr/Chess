@@ -32,6 +32,7 @@ const ChessBoard = {
     this.containerId = containerId;
     this.playerColor = options.playerColor || options.orientation || 'white';
     this.orientation = options.orientation || 'white';
+    window.isBoardFlipped = this.orientation === 'black';
     this.interactive = options.interactive !== false;
     this.allowPremove = options.allowPremove !== false;
     this.showToolbar = options.showToolbar !== false;
@@ -314,12 +315,14 @@ const ChessBoard = {
    */
   flip() {
     this.orientation = this.orientation === 'white' ? 'black' : 'white';
+    window.isBoardFlipped = this.orientation === 'black';
     this.render();
     this.bindEvents();
   },
 
   setOrientation(color) {
     this.orientation = color;
+    window.isBoardFlipped = this.orientation === 'black';
     this.render();
     this.bindEvents();
   },
@@ -557,7 +560,7 @@ const ChessBoard = {
   handleMouseDown(e, squareEl) {
     const square = squareEl.dataset.square;
 
-    // Right-click: Start arrow drawing or cancel premove
+    // Right-click: Start arrow drawing or cancel premove (Do not draw preview during drag)
     if (e.button === 2) {
       e.preventDefault();
       if (this.premove) {
@@ -570,6 +573,7 @@ const ChessBoard = {
         startX: e.clientX,
         startY: e.clientY
       };
+      window.arrowStartSquare = square;
       return;
     }
 
@@ -596,36 +600,29 @@ const ChessBoard = {
   },
 
   handleMouseMove(e) {
-    // Arrow preview during right-click drag
-    if (this.rightDrag) {
-      const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('.square');
-      if (el && el.dataset.square !== this.rightDrag.from) {
-        this.renderArrowPreview(this.rightDrag.from, el.dataset.square);
-      } else {
-        this.clearArrowPreview();
-      }
-    }
-
-    // Piece drag handling
+    // Piece drag handling (No live preview arrows during right-click drag per spec)
     if (this.dragging) {
       this.handleDrag(e);
     }
   },
 
   handleMouseUp(e) {
-    // Right-click release: Finalize arrow or square highlight
+    // Right-click release: Render arrow ONLY on mouseup if start !== end
     if (e.button === 2 && this.rightDrag) {
       e.preventDefault();
       const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('.square');
       const targetSq = el?.dataset.square || this.rightDrag.from;
-      this.clearArrowPreview();
 
       if (targetSq === this.rightDrag.from) {
         this.toggleSquareHighlight(targetSq);
       } else {
+        if (typeof window.drawMoveArrowFixed === 'function') {
+          window.drawMoveArrowFixed(this.rightDrag.from, targetSq, '#3b82f6', false);
+        }
         this.toggleArrow(this.rightDrag.from, targetSq);
       }
       this.rightDrag = null;
+      window.arrowStartSquare = null;
       return;
     }
 
@@ -676,40 +673,64 @@ const ChessBoard = {
       this.dragPieceEl = null;
     }
 
+    const snapBack = () => {
+      document.querySelectorAll('.chess-piece.is-dragging, .piece.is-dragging').forEach(p => {
+        p.classList.remove('is-dragging');
+      });
+      const originSq = document.querySelector(`[data-square="${this.dragging?.from}"]`);
+      if (originSq) {
+        const pEl = originSq.querySelector('.chess-piece, .piece');
+        if (pEl) pEl.classList.remove('is-dragging');
+      }
+      this.selectedSquare = null;
+      this.legalMoves = [];
+      this.render();
+      this.bindEvents();
+      this.dragging = null;
+    };
+
     if (this.dragging.hasMoved) {
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const squareEl = el?.closest('.square');
-      if (squareEl) {
-        const targetSquare = squareEl.dataset.square;
-        if (this.isMyTurn()) {
-          if (this.legalMoves.includes(targetSquare)) {
-            this.tryMove(this.dragging.from, targetSquare);
-          } else {
-            this.selectedSquare = null;
-            this.legalMoves = [];
-            this.render();
-            this.bindEvents();
-          }
-        } else if (this.allowPremove && targetSquare !== this.dragging.from) {
-          // Set premove from drag drop
-          const piece = this.dragging.piece;
-          const isPawn = piece?.toLowerCase() === 'p';
-          const targetRank = parseInt(targetSquare[1]);
-          const isPromo = isPawn && (targetRank === 8 || targetRank === 1);
+      if (!squareEl) {
+        // Off-board drop -> Snap-back immediately
+        snapBack();
+        return;
+      }
 
-          this.premove = {
-            from: this.dragging.from,
-            to: targetSquare,
-            promotion: isPromo ? 'q' : undefined
-          };
-          this.selectedSquare = null;
-          this.legalMoves = [];
-          this.render();
-          this.bindEvents();
+      const targetSquare = squareEl.dataset.square;
+      if (this.isMyTurn()) {
+        if (this.legalMoves.includes(targetSquare)) {
+          document.querySelectorAll('.chess-piece.is-dragging, .piece.is-dragging').forEach(p => p.classList.remove('is-dragging'));
+          this.tryMove(this.dragging.from, targetSquare);
+        } else {
+          // Illegal move -> Snap-back immediately
+          snapBack();
+          return;
         }
+      } else if (this.allowPremove && targetSquare !== this.dragging.from) {
+        document.querySelectorAll('.chess-piece.is-dragging, .piece.is-dragging').forEach(p => p.classList.remove('is-dragging'));
+        const piece = this.dragging.piece;
+        const isPawn = piece?.toLowerCase() === 'p';
+        const targetRank = parseInt(targetSquare[1]);
+        const isPromo = isPawn && (targetRank === 8 || targetRank === 1);
+
+        this.premove = {
+          from: this.dragging.from,
+          to: targetSquare,
+          promotion: isPromo ? 'q' : undefined
+        };
+        this.selectedSquare = null;
+        this.legalMoves = [];
+        this.render();
+        this.bindEvents();
+      } else {
+        snapBack();
+        return;
       }
     }
 
+    document.querySelectorAll('.chess-piece.is-dragging, .piece.is-dragging').forEach(p => p.classList.remove('is-dragging'));
     this.dragging = null;
   },
 
@@ -1015,22 +1036,23 @@ const ChessBoard = {
  * Expects an <svg id="board-arrows" viewBox="0 0 800 800"> overlay on the board.
  */
 function drawMoveArrow(fromSq, toSq, color = '#3b82f6', isBestMove = false) {
+  if (typeof window.drawMoveArrowFixed === 'function') {
+    return window.drawMoveArrowFixed(fromSq, toSq, color, isBestMove);
+  }
   const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
   if (!svg || !fromSq || !toSq || fromSq.length < 2 || toSq.length < 2) return;
   const files = 'abcdefgh';
   
-  const orientation = (window.ChessBoard && window.ChessBoard.orientation) || 'white';
-  let c1 = files.indexOf(fromSq[0]);
-  let r1 = 8 - parseInt(fromSq[1], 10);
-  let c2 = files.indexOf(toSq[0]);
-  let r2 = 8 - parseInt(toSq[1], 10);
+  const isFlipped = (window.isBoardFlipped !== undefined) ? window.isBoardFlipped : (window.ChessBoard && window.ChessBoard.orientation === 'black');
+  const fileIdx1 = files.indexOf(fromSq[0]);
+  const rankIdx1 = parseInt(fromSq[1], 10) - 1;
+  const fileIdx2 = files.indexOf(toSq[0]);
+  const rankIdx2 = parseInt(toSq[1], 10) - 1;
 
-  if (orientation === 'black') {
-    c1 = 7 - c1;
-    r1 = 7 - r1;
-    c2 = 7 - c2;
-    r2 = 7 - r2;
-  }
+  const c1 = isFlipped ? (7 - fileIdx1) : fileIdx1;
+  const r1 = isFlipped ? rankIdx1 : (7 - rankIdx1);
+  const c2 = isFlipped ? (7 - fileIdx2) : fileIdx2;
+  const r2 = isFlipped ? rankIdx2 : (7 - rankIdx2);
   
   const x1 = c1 * 100 + 50, y1 = r1 * 100 + 50;
   const x2 = c2 * 100 + 50, y2 = r2 * 100 + 50;
@@ -1051,7 +1073,6 @@ function drawMoveArrow(fromSq, toSq, color = '#3b82f6', isBestMove = false) {
   const isKnightMove = (Math.abs(dx) === 1 && Math.abs(dy) === 2) || (Math.abs(dx) === 2 && Math.abs(dy) === 1);
 
   if (isKnightMove) {
-    // 90-degree hook: travel along the 2-square axis first, then bend 90 degrees
     const midX = Math.abs(dx) === 2 ? x2 : x1;
     const midY = Math.abs(dy) === 2 ? y2 : y1;
     path.setAttribute('d', `M ${x1} ${y1} L ${midX} ${midY} L ${x2} ${y2}`);
@@ -1064,7 +1085,7 @@ function drawMoveArrow(fromSq, toSq, color = '#3b82f6', isBestMove = false) {
   path.setAttribute('stroke-width', isBestMove ? '20' : '16');
   path.setAttribute('stroke-linecap', 'round');
   path.setAttribute('stroke-linejoin', 'round');
-  path.setAttribute('opacity', '0.85');
+  path.setAttribute('opacity', '0.88');
   path.setAttribute('marker-end', `url(#${markerId})`);
   svg.appendChild(path);
 }
@@ -1073,6 +1094,9 @@ function drawMoveArrow(fromSq, toSq, color = '#3b82f6', isBestMove = false) {
  * 2. Clear Arrows & Premoves on Screen Click
  */
 function clearAnnotationsAndPremoves() {
+  if (typeof window.resetBoardVisualState === 'function') {
+    window.resetBoardVisualState();
+  }
   const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
   if (svg) svg.querySelectorAll('path, line').forEach(p => p.remove());
   document.querySelectorAll('.highlight-analysis, .highlight-premove, .square-eval-badge, .highlight-green, .highlight-cyan, .highlight-red, .premove-from, .premove-to').forEach(el => {
@@ -1091,7 +1115,7 @@ function clearAnnotationsAndPremoves() {
 
 document.addEventListener('mousedown', (e) => {
   if (e.button === 0) {
-    if (e.target.closest('input, textarea, select, .modal-overlay:not(.hidden) .modal')) return;
+    if (e.target.closest('input, textarea, select, .modal-overlay:not(.hidden) .modal, .engine-line')) return;
     clearAnnotationsAndPremoves();
   }
 });
@@ -1111,7 +1135,9 @@ function bindPieceDragEvents(pieceElement) {
     requestAnimationFrame(() => pieceElement.classList.add('is-dragging'));
   });
   pieceElement.addEventListener('dragend', () => {
-    pieceElement.classList.remove('is-dragging');
+    document.querySelectorAll('.chess-piece.is-dragging, .piece.is-dragging').forEach(p => {
+      p.classList.remove('is-dragging');
+    });
   });
 }
 

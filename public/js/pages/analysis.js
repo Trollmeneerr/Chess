@@ -582,17 +582,15 @@ const AnalysisPage = {
       </div>
 
       <div class="analysis-layout">
-        <!-- Eval Bar -->
-        <div class="eval-bar-container">
-          <div class="eval-bar-label" id="analysis-eval-label">0.0</div>
-          <div class="eval-bar">
-            <div class="eval-bar-fill" id="analysis-eval-fill"></div>
-          </div>
-        </div>
-
-        <!-- Board Wrapper -->
+        <!-- Board Wrapper with Left-Hand Eval Bar -->
         <div class="board-wrapper">
-          <div id="board-container"></div>
+          <div class="board-middle-row" style="display:flex;flex-direction:row;align-items:stretch;justify-content:center;position:relative;">
+            <div id="eval-bar" class="eval-bar">
+              <div id="eval-fill" class="eval-fill" style="height: 50%;"></div>
+              <span id="eval-score" class="eval-score">0.0</span>
+            </div>
+            <div id="board-container"></div>
+          </div>
 
           <!-- Move Stepper Bar -->
           <div class="glass-panel mt-2" style="padding:10px;display:flex;gap:8px;justify-content:center;align-items:center;">
@@ -615,7 +613,61 @@ const AnalysisPage = {
         </div>
 
         <!-- Right Analysis Sidebar -->
-        <div class="analysis-sidebar">
+        <div class="analysis-sidebar dashboard-panels">
+          <!-- 1. Analysis Panel (Top 3 Engine Lines) -->
+          <section id="analysis-panel" class="panel glass-panel" style="margin-bottom:12px;padding:14px;">
+            <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <h3 style="margin:0;font-size:14px;">Game Analysis</h3>
+              <span class="eval-depth badge badge-accent" id="engine-depth">Depth 20</span>
+            </div>
+            
+            <!-- Top 3 Engine Lines (MultiPV) -->
+            <div id="engine-lines" class="engine-lines">
+              <div class="engine-line" data-multipv="1">
+                <span class="line-eval blue-eval">+1.45</span>
+                <span class="line-moves">1. e4 e5 2. Nf3 Nc6 3. Bb5</span>
+              </div>
+              <div class="engine-line" data-multipv="2">
+                <span class="line-eval">+0.80</span>
+                <span class="line-moves">1. d4 d5 2. c4 e6 3. Nc3</span>
+              </div>
+              <div class="engine-line" data-multipv="3">
+                <span class="line-eval">+0.42</span>
+                <span class="line-moves">1. Nf3 d5 2. g3 Nf6 3. Bg2</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2. Post-Game Summary Panel (Shows on Right Side After Game Ends) -->
+          <section id="post-game-panel" class="panel hidden glass-panel" style="margin-bottom:14px;padding:16px;">
+            <div class="game-over-header">
+              <h2 id="game-result-title">White Won</h2>
+              <p id="game-result-reason">by Checkmate</p>
+            </div>
+
+            <!-- Accuracy Preview Row -->
+            <div class="accuracy-box">
+              <div class="acc-player">
+                <span class="acc-label">White Accuracy</span>
+                <strong class="acc-val blue-badge" id="white-acc">89.4%</strong>
+              </div>
+              <div class="acc-player">
+                <span class="acc-label">Black Accuracy</span>
+                <strong class="acc-val" id="black-acc">76.1%</strong>
+              </div>
+            </div>
+
+            <a href="#review" onclick="switchMode('analysis')" class="btn-primary review-cta">
+              <strong>Game Review</strong>
+              <span>See top 3 lines & best blue moves</span>
+            </a>
+
+            <div class="post-game-actions">
+              <button onclick="startNewGame()" class="btn-secondary">New Game</button>
+              <button onclick="requestRematch()" class="btn-secondary">Rematch</button>
+            </div>
+          </section>
+
           <!-- Accuracy Card -->
           <div class="accuracy-display glass-panel">
             <div style="display:flex;justify-content:space-around;align-items:center;margin-bottom:12px;">
@@ -766,10 +818,13 @@ const AnalysisPage = {
 
     if (index === -1) {
       ChessBoard.update(AppConfig.INITIAL_FEN, { lastMove: null });
-      if (typeof clearAnnotationsAndPremoves === 'function') clearAnnotationsAndPremoves();
+      if (typeof resetBoardVisualState === 'function') resetBoardVisualState();
       if (indicator) indicator.textContent = 'Initial Position';
       if (retryBanner) retryBanner.classList.add('hidden');
       this.updateEvalBar(0);
+      if (typeof updateEvaluationBar === 'function') updateEvaluationBar(0, null);
+      if (typeof playChessSound === 'function') playChessSound('move');
+      if (typeof evaluatePositionWithWorker === 'function') evaluatePositionWithWorker(AppConfig.INITIAL_FEN);
       return;
     }
 
@@ -778,12 +833,32 @@ const AnalysisPage = {
 
     // Board position
     const fen = currentMove.fen;
-    const from = currentMove.uci.substring(0, 2);
-    const to = currentMove.uci.substring(2, 4);
+    const from = currentMove.from || currentMove.uci.substring(0, 2);
+    const to = currentMove.to || currentMove.uci.substring(2, 4);
 
     ChessBoard.update(fen, {
       lastMove: { from, to }
     });
+
+    // Wipe leftover classes and apply highlights to moveHistory[currentMoveIndex].from and to (the move just played, not currentMoveIndex - 1)
+    if (typeof resetBoardVisualState === 'function') {
+      resetBoardVisualState();
+    }
+    document.querySelector(`[data-square="${from}"]`)?.classList.add('highlight-analysis');
+    document.querySelector(`[data-square="${to}"]`)?.classList.add('highlight-analysis');
+
+    // Trigger wooden sound synthesizer
+    if (typeof playChessSound === 'function') {
+      if (currentMove.inCheck || currentMove.san?.includes('+') || currentMove.san?.includes('#')) {
+        playChessSound('check');
+      } else if (currentMove.captured || currentMove.san?.includes('x')) {
+        playChessSound('capture');
+      } else if (currentMove.san === 'O-O' || currentMove.san === 'O-O-O') {
+        playChessSound('castle');
+      } else {
+        playChessSound('move');
+      }
+    }
 
     let bestFrom = null;
     let bestTo = null;
@@ -792,21 +867,31 @@ const AnalysisPage = {
       bestTo = currentMove.bestMove.substring(2, 4);
     }
 
-    // Trigger Analysis Highlight & badge on destination square + Blue Best Move arrow
-    if (typeof showMoveAnalysis === 'function') {
-      showMoveAnalysis(from, to, bestFrom, bestTo, currentMove.classification);
-    }
-
     // Always render engine's best move using a solid Blue arrow (#3b82f6)
-    if (bestFrom && bestTo && typeof drawMoveArrow === 'function') {
-      drawMoveArrow(bestFrom, bestTo, '#3b82f6', true);
+    if (['inaccuracy', 'mistake', 'blunder'].includes(currentMove.classification) && bestFrom && bestTo) {
+      if (typeof drawMoveArrowFixed === 'function') {
+        drawMoveArrowFixed(bestFrom, bestTo, '#3b82f6', true);
+      } else if (typeof drawMoveArrow === 'function') {
+        drawMoveArrow(bestFrom, bestTo, '#3b82f6', true);
+      }
     }
 
     if (indicator) {
       indicator.textContent = `Move ${currentMove.moveNumber}: ${currentMove.san} (${currentMove.badge || ''})`;
     }
 
+    const evalCp = currentMove.evalCp !== undefined
+      ? currentMove.evalCp
+      : (currentMove.eval !== undefined ? Math.round(currentMove.eval * 100) : 0);
     this.updateEvalBar(currentMove.eval || 0);
+    if (typeof updateEvaluationBar === 'function') {
+      updateEvaluationBar(evalCp, currentMove.mate);
+    }
+
+    // Stream Top 3 lines for this position using Stockfish WebWorker hook
+    if (fen && typeof evaluatePositionWithWorker === 'function') {
+      evaluatePositionWithWorker(fen);
+    }
 
     // Show Retry Mistake banner if move was mistake, blunder, or inaccuracy
     if (['blunder', 'mistake', 'inaccuracy'].includes(currentMove.classification)) {
