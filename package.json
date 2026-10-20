@@ -9,7 +9,8 @@
     "update": "node src/updater.js",
     "build": "echo 'No build step needed - vanilla JS'",
     "reset-pass": "node src/cli/reset-password.js",
-    "seed-puzzles": "node src/cli/seed-puzzles.js"
+    "seed-puzzles": "node src/cli/seed-puzzles.js",
+    "fix-db": "node src/cli/fix-db.js"
   },
   "repository": {
     "type": "git",

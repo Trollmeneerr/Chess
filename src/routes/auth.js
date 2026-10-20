@@ -10,7 +10,7 @@ const { generateToken, authMiddleware } = require('../middleware/auth');
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { username, password, avatar_id } = req.body;
+    const { username, password, avatar_id, timezone_id } = req.body || {};
 
     // Validate username
     if (!username || username.length < 3 || username.length > 20) {
@@ -41,7 +41,16 @@ router.post('/register', async (req, res) => {
 
     // Insert user
     const avatarId = parseInt(avatar_id) || Math.floor(Math.random() * 16) + 1;
-    const tzId = (timezone_id && typeof timezone_id === 'string' && timezone_id.trim()) ? timezone_id.trim() : 'UTC';
+    let tzId = 'UTC';
+    if (timezone_id && typeof timezone_id === 'string' && timezone_id.trim()) {
+      const candidate = timezone_id.trim();
+      try {
+        Intl.DateTimeFormat(undefined, { timeZone: candidate });
+        tzId = candidate;
+      } catch (e) {
+        tzId = 'UTC';
+      }
+    }
     const result = await db.insert(
       'INSERT INTO users (username, password_hash, avatar_id, timezone_id) VALUES (?, ?, ?, ?)',
       [username, password_hash, avatarId, tzId]
