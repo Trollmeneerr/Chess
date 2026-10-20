@@ -123,11 +123,18 @@ async function checkAndApplyUpdates() {
 
     console.log('[Updater] Checking for updates on remote repository...');
 
-    // 1. Get current branch (default to main)
+    // 1. Get current branch (default to main, migrate master -> main)
     let branch = 'main';
     try {
       const b = runGit(gitBin, ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
-      if (b && b !== 'HEAD') branch = b;
+      if (b === 'master') {
+        try {
+          runGit(gitBin, ['branch', '-m', 'master', 'main']);
+        } catch (e) {}
+        branch = 'main';
+      } else if (b && b !== 'HEAD') {
+        branch = b;
+      }
     } catch (e) {}
 
     // Ensure remote origin is set
@@ -138,8 +145,18 @@ async function checkAndApplyUpdates() {
       }
     } catch (e) {}
 
-    // 2. Fetch remote branch
-    runGit(gitBin, ['fetch', 'origin', branch, '--quiet'], { timeout: 30000 });
+    // 2. Fetch remote branch with main fallback
+    try {
+      runGit(gitBin, ['fetch', 'origin', branch, '--quiet'], { timeout: 30000 });
+    } catch (fetchErr) {
+      if (branch !== 'main') {
+        console.log(`[Updater] Notice: Remote branch ${branch} not found. Falling back to origin/main...`);
+        branch = 'main';
+        runGit(gitBin, ['fetch', 'origin', 'main', '--quiet'], { timeout: 30000 });
+      } else {
+        throw fetchErr;
+      }
+    }
 
     // 3. Compare local HEAD and remote tracking branch
     const localHash = runGit(gitBin, ['rev-parse', 'HEAD']).trim();
