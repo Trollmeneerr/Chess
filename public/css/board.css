@@ -111,11 +111,20 @@
   --board-dark: #4b7399;
 }
 
-/* Hide original piece on square while dragging */
-.square .chess-piece.is-dragging,
-.square .piece.is-dragging {
+/* Hide original piece on square ONLY while an active dragging clone is in motion */
+body.dragging-active .square .chess-piece.is-dragging,
+body.dragging-active .square .piece.is-dragging,
+body:has(.piece.dragging) .square .chess-piece.is-dragging,
+body:has(.piece.dragging) .square .piece.is-dragging {
   opacity: 0 !important;
   visibility: hidden !important;
+}
+
+/* Fallback: when not actively dragging, pieces on squares must always remain visible */
+body:not(.dragging-active) .square .chess-piece,
+body:not(.dragging-active) .square .piece {
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 /* King in Check Highlight */

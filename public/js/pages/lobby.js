@@ -112,7 +112,7 @@ const LobbyPage = {
                   </div>
                   <div class="lobby-card-desc">Create private match rooms, share instant invite links, with live Stockfish eval bar and clocks.</div>
                 </div>
-                <button class="btn btn-fill btn-sm btn-block mt-2">Play PvP</button>
+                <div class="btn btn-fill btn-sm btn-block mt-2">Play PvP</div>
               </a>
 
               <!-- Card: Play Bots -->
@@ -135,7 +135,7 @@ const LobbyPage = {
                   </div>
                   <div class="lobby-card-desc">Battle 9 calibrated AI personalities from 250 Frosty to 2000 Absolute Zero with live evaluation bar.</div>
                 </div>
-                <button class="btn btn-fill btn-sm btn-block mt-2">Challenge Bots</button>
+                <div class="btn btn-fill btn-sm btn-block mt-2">Challenge Bots</div>
               </a>
 
               <!-- Card: Tactical Puzzles -->
@@ -154,7 +154,7 @@ const LobbyPage = {
                   </div>
                   <div class="lobby-card-desc">Solve 50,000+ tactical puzzles across 5 difficulty tiers. Gain +1 ELO per correct tactical solution.</div>
                 </div>
-                <button class="btn btn-fill btn-sm btn-block mt-2">Solve Puzzles</button>
+                <div class="btn btn-fill btn-sm btn-block mt-2">Solve Puzzles</div>
               </a>
 
               <!-- Card: Game Review -->
@@ -174,7 +174,7 @@ const LobbyPage = {
                   </div>
                   <div class="lobby-card-desc">Review your matches with Stockfish 16.1. Pinpoint inaccuracies, blunders, and brilliant moves.</div>
                 </div>
-                <button class="btn btn-outline btn-sm btn-block mt-2">Analyze Matches</button>
+                <div class="btn btn-outline btn-sm btn-block mt-2">Analyze Matches</div>
               </a>
 
               <!-- Card: Leaderboards -->
@@ -195,7 +195,7 @@ const LobbyPage = {
                   </div>
                   <div class="lobby-card-desc">Compare player ratings, puzzle streaks, and boss defeat achievements across the community.</div>
                 </div>
-                <button class="btn btn-outline btn-sm btn-block mt-2">View Ranks</button>
+                <div class="btn btn-outline btn-sm btn-block mt-2">View Ranks</div>
               </a>
 
               <!-- Card: Profile & Stats -->
@@ -215,7 +215,7 @@ const LobbyPage = {
                   </div>
                   <div class="lobby-card-desc">Manage your avatar, view detailed rating progress, friend lists, and replay archived games.</div>
                 </div>
-                <button class="btn btn-outline btn-sm btn-block mt-2">View Profile</button>
+                <div class="btn btn-outline btn-sm btn-block mt-2">View Profile</div>
               </a>
             </div>
 

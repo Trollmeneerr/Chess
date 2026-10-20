@@ -870,8 +870,8 @@
 /* --- Avatar Grid --- */
 .avatar-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
   margin: 12px 0;
 }
 
@@ -1371,15 +1371,14 @@
   }
 }
 
-/* --- Replay Modal --- */
 .replay-modal-wrap {
-  max-width: 800px;
   width: 100%;
+}
+
+#game-replay-modal .modal {
+  max-width: 860px;
+  width: 95%;
   padding: 24px;
-  background: var(--p-surface);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.85);
 }
 
 .replay-header {

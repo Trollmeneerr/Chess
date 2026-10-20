@@ -243,6 +243,7 @@ const PlayPage = {
 
             <!-- Player bar -->
             <div class="player-bar mt-2" id="player-bar">
+              <div class="player-info-badge">
                 <div class="player-avatar-wrap">
                   <span class="player-avatar-svg" id="self-avatar">
                     ${Auth.currentUser ? AppConfig.getAvatarHTML(Auth.currentUser.avatar_id) : AppConfig.getPiece('K')}

@@ -6,7 +6,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-const MAX_DEPTH = parseInt(process.env.STOCKFISH_MAX_DEPTH) || 8;
+const MAX_DEPTH = parseInt(process.env.STOCKFISH_MAX_DEPTH) || 16;
 const HASH_MB = parseInt(process.env.STOCKFISH_HASH_MB) || 256;
 const THREADS = parseInt(process.env.STOCKFISH_THREADS) || 1;
 

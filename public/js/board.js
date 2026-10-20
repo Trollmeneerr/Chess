@@ -217,7 +217,7 @@ const ChessBoard = {
         html += `<div class="${classes}" data-square="${sq}" data-rank="${rank}" data-file="${file}">`;
         html += coordHTML;
         if (piece) {
-          const isDraggingPiece = Boolean(this.dragging && this.dragging.from === sq);
+          const isDraggingPiece = Boolean(this.dragging && this.dragging.hasMoved && this.dragging.from === sq);
           html += `<span class="piece chess-piece${isDraggingPiece ? ' is-dragging' : ''}" data-piece="${piece}">${AppConfig.getPiece(piece)}</span>`;
         }
         html += '</div>';
@@ -498,6 +498,10 @@ const ChessBoard = {
   },
 
   handleClick(e, squareEl) {
+    if (this._justDropped) {
+      this._justDropped = false;
+      return;
+    }
     if (this.dragging?.hasMoved) return; // Was a piece drag, not a click
 
     const square = squareEl.dataset.square;
@@ -640,6 +644,8 @@ const ChessBoard = {
 
     if (!this.dragging.hasMoved && (dx > 5 || dy > 5)) {
       this.dragging.hasMoved = true;
+      document.body.classList.add('dragging-active');
+
       // Create floating piece
       this.dragPieceEl = document.createElement('div');
       this.dragPieceEl.className = 'piece dragging';
@@ -668,70 +674,79 @@ const ChessBoard = {
   handleDrop(e) {
     if (!this.dragging) return;
 
+    const dragInfo = this.dragging;
+    const hasMoved = dragInfo.hasMoved;
+    this.dragging = null; // Always clear dragging state FIRST so render() never marks pieces as is-dragging
+
+    document.body.classList.remove('dragging-active');
+
     if (this.dragPieceEl) {
       this.dragPieceEl.remove();
       this.dragPieceEl = null;
     }
 
-    const snapBack = () => {
-      document.querySelectorAll('.chess-piece.is-dragging, .piece.is-dragging').forEach(p => {
-        p.classList.remove('is-dragging');
-      });
-      const originSq = document.querySelector(`[data-square="${this.dragging?.from}"]`);
-      if (originSq) {
-        const pEl = originSq.querySelector('.chess-piece, .piece');
-        if (pEl) pEl.classList.remove('is-dragging');
+    // Immediately remove is-dragging class from all pieces on the board
+    document.querySelectorAll('.chess-piece.is-dragging, .piece.is-dragging').forEach(p => {
+      p.classList.remove('is-dragging');
+    });
+
+    if (hasMoved) {
+      this._justDropped = true;
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const squareEl = el?.closest('.square');
+      const targetSquare = squareEl?.dataset?.square;
+
+      if (targetSquare && targetSquare !== dragInfo.from) {
+        if (this.isMyTurn()) {
+          if (this.legalMoves.includes(targetSquare)) {
+            // Optimistic DOM placement on target square so piece never disappears
+            const originSq = document.querySelector(`[data-square="${dragInfo.from}"]`);
+            const targetSqEl = document.querySelector(`[data-square="${targetSquare}"]`);
+            const pieceEl = originSq?.querySelector('.chess-piece, .piece');
+
+            if (originSq && targetSqEl && pieceEl) {
+              const captured = targetSqEl.querySelector('.chess-piece, .piece');
+              if (captured) captured.remove();
+              pieceEl.classList.remove('is-dragging');
+              targetSqEl.appendChild(pieceEl);
+            }
+
+            this.tryMove(dragInfo.from, targetSquare);
+            return;
+          }
+        } else if (this.allowPremove) {
+          const piece = dragInfo.piece;
+          const isPawn = piece?.toLowerCase() === 'p';
+          const targetRank = parseInt(targetSquare[1]);
+          const isPromo = isPawn && (targetRank === 8 || targetRank === 1);
+
+          this.premove = {
+            from: dragInfo.from,
+            to: targetSquare,
+            promotion: isPromo ? 'q' : undefined
+          };
+          this.selectedSquare = null;
+          this.legalMoves = [];
+          this.render();
+          this.bindEvents();
+          return;
+        }
       }
+
+      // Snap-back: Illegal move, off-board, or dropped on same square
       this.selectedSquare = null;
       this.legalMoves = [];
       this.render();
       this.bindEvents();
-      this.dragging = null;
-    };
-
-    if (this.dragging.hasMoved) {
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      const squareEl = el?.closest('.square');
-      if (!squareEl) {
-        // Off-board drop -> Snap-back immediately
-        snapBack();
-        return;
-      }
-
-      const targetSquare = squareEl.dataset.square;
-      if (this.isMyTurn()) {
-        if (this.legalMoves.includes(targetSquare)) {
-          document.querySelectorAll('.chess-piece.is-dragging, .piece.is-dragging').forEach(p => p.classList.remove('is-dragging'));
-          this.tryMove(this.dragging.from, targetSquare);
-        } else {
-          // Illegal move -> Snap-back immediately
-          snapBack();
-          return;
-        }
-      } else if (this.allowPremove && targetSquare !== this.dragging.from) {
-        document.querySelectorAll('.chess-piece.is-dragging, .piece.is-dragging').forEach(p => p.classList.remove('is-dragging'));
-        const piece = this.dragging.piece;
-        const isPawn = piece?.toLowerCase() === 'p';
-        const targetRank = parseInt(targetSquare[1]);
-        const isPromo = isPawn && (targetRank === 8 || targetRank === 1);
-
-        this.premove = {
-          from: this.dragging.from,
-          to: targetSquare,
-          promotion: isPromo ? 'q' : undefined
-        };
-        this.selectedSquare = null;
-        this.legalMoves = [];
-        this.render();
-        this.bindEvents();
-      } else {
-        snapBack();
-        return;
-      }
+      return;
     }
 
-    document.querySelectorAll('.chess-piece.is-dragging, .piece.is-dragging').forEach(p => p.classList.remove('is-dragging'));
-    this.dragging = null;
+    // Was a click or tiny movement without dragging (>5px)
+    this.selectedSquare = null;
+    this.legalMoves = [];
+    document.querySelectorAll('.chess-piece.is-dragging, .piece.is-dragging').forEach(p => {
+      p.classList.remove('is-dragging');
+    });
   },
 
   selectSquare(square, isPremove = false) {
@@ -952,22 +967,54 @@ const ChessBoard = {
 
     const turn = this.getTurn();
     const pieces = modal.querySelectorAll('.promotion-piece');
+    const pieceLabels = { q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight' };
+
+    const cleanup = () => {
+      modal.classList.add('hidden');
+      modal.removeEventListener('click', overlayHandler);
+      document.getElementById('promotion-modal-close')?.removeEventListener('click', cancelHandler);
+      document.getElementById('btn-cancel-promotion')?.removeEventListener('click', cancelHandler);
+      pieceClickHandlers.forEach(({ btn, fn }) => btn.removeEventListener('click', fn));
+    };
+
+    const cancelHandler = () => {
+      cleanup();
+      this.selectedSquare = null;
+      this.legalMoves = [];
+      this.render();
+      this.bindEvents();
+    };
+
+    const overlayHandler = (e) => {
+      if (e.target === modal) cancelHandler();
+    };
+
+    modal.addEventListener('click', overlayHandler);
+    document.getElementById('promotion-modal-close')?.addEventListener('click', cancelHandler);
+    document.getElementById('btn-cancel-promotion')?.addEventListener('click', cancelHandler);
+
+    const pieceClickHandlers = [];
     pieces.forEach(btn => {
       const p = btn.dataset.piece;
       const pieceKey = turn === 'w' ? p.toUpperCase() : p.toLowerCase();
-      btn.innerHTML = `<span class="piece" data-piece="${pieceKey}">${AppConfig.getPiece(pieceKey)}</span>`;
+      btn.innerHTML = `
+        <div class="promo-piece-svg">
+          <span class="piece" data-piece="${pieceKey}">${AppConfig.getPiece(pieceKey)}</span>
+        </div>
+        <span class="promo-piece-label">${pieceLabels[p] || p}</span>
+      `;
 
-      const handler = () => {
+      const fn = () => {
         const promotion = btn.dataset.piece;
-        modal.classList.add('hidden');
+        cleanup();
         if (this.onMove) {
           this.onMove({ from, to, promotion });
         }
         this.selectedSquare = null;
         this.legalMoves = [];
-        pieces.forEach(b => b.removeEventListener('click', handler));
       };
-      btn.addEventListener('click', handler);
+      btn.addEventListener('click', fn);
+      pieceClickHandlers.push({ btn, fn });
     });
   },
 

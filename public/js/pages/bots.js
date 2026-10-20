@@ -47,7 +47,7 @@ const BotsPage = {
           <div class="bot-name">${b.name}</div>
           <div class="bot-elo">${b.elo} ELO</div>
           <div class="bot-desc">${b.desc}</div>
-          <button class="btn btn-fill btn-sm btn-block mt-2">Challenge</button>
+          <div class="btn btn-fill btn-sm btn-block mt-2">Challenge</div>
         </div>
       `;
     });

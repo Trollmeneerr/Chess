@@ -266,6 +266,12 @@ const PuzzlesPage = {
     feedback.classList.remove('hidden');
     feedback.textContent = '✗ Incorrect move. Try another line!';
 
+    // Snap back piece so it does not stay displaced on the wrong square
+    ChessBoard.selectedSquare = null;
+    ChessBoard.legalMoves = [];
+    ChessBoard.render();
+    ChessBoard.bindEvents();
+
     if (Auth.currentUser) {
       try {
         await Api.post(`/puzzles/${this.currentPuzzle.puzzle_id}/attempt`, {

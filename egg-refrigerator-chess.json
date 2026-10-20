@@ -40,32 +40,32 @@
     },
     {
       "name": "Stockfish Max Depth",
-      "description": "Hard search cap for Stockfish engine evaluations (Strictly enforced at 8 as per specification to prevent CPU bottlenecking).",
+      "description": "Maximum calculation depth for the Stockfish engine (1-64 plies). Higher values produce deeper tactical analysis and more accurate evaluations on high-performance CPUs.",
       "env_variable": "STOCKFISH_MAX_DEPTH",
-      "default_value": "8",
+      "default_value": "16",
       "user_viewable": true,
       "user_editable": true,
-      "rules": "required|integer|between:1,15",
+      "rules": "required|integer|between:1,64",
       "field_type": "text"
     },
     {
       "name": "Stockfish Hash Memory (MB)",
-      "description": "Memory allocation in megabytes for the Stockfish transposition hash table.",
+      "description": "Memory allocation in megabytes for the Stockfish transposition hash table (16-32768 MB). Set to 512MB-2048MB+ for dedicated nodes to improve evaluation speed and cached positions.",
       "env_variable": "STOCKFISH_HASH_MB",
-      "default_value": "256",
+      "default_value": "512",
       "user_viewable": true,
       "user_editable": true,
-      "rules": "required|integer|between:16,1024",
+      "rules": "required|integer|between:16,32768",
       "field_type": "text"
     },
     {
       "name": "Stockfish CPU Threads",
-      "description": "Number of CPU threads allocated to the Stockfish engine process.",
+      "description": "Number of CPU threads allocated to the Stockfish engine process (1-64 threads). Matches your server's assigned vCPU cores for faster multi-threaded analysis.",
       "env_variable": "STOCKFISH_THREADS",
-      "default_value": "1",
+      "default_value": "2",
       "user_viewable": true,
       "user_editable": true,
-      "rules": "required|integer|between:1,4",
+      "rules": "required|integer|between:1,64",
       "field_type": "text"
     },
     {

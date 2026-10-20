@@ -42,10 +42,7 @@ function resetBoardVisualState() {
       'highlight-green',
       'highlight-red',
       'highlight-blue',
-      'highlight-cyan',
-      'selected',
-      'legal-move',
-      'legal-capture'
+      'highlight-cyan'
     );
   });
 
@@ -53,17 +50,13 @@ function resetBoardVisualState() {
     p.classList.remove('is-dragging');
   });
 
+  document.body.classList.remove('dragging-active');
   document.querySelectorAll('.square-eval-badge').forEach(b => b.remove());
 
   if (window.ChessBoard) {
     window.ChessBoard.arrows = [];
     window.ChessBoard.highlightedSquares?.clear();
-    window.ChessBoard.selectedSquare = null;
-    window.ChessBoard.legalMoves = [];
-    window.ChessBoard.lastMove = null;
-    window.ChessBoard.inCheck = false;
     window.ChessBoard.checkSquare = null;
-    window.ChessBoard.premove = null;
   }
 }
 
@@ -179,11 +172,22 @@ document.addEventListener('mousedown', (e) => {
     window.arrowStartSquare = sqEl.dataset.square;
   } else if (e.button === 0) {
     if (e.target.closest('input, textarea, select, button, .modal, .chat-panel')) return;
-    resetBoardVisualState();
+    const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
+    if (svg) svg.querySelectorAll('path, line').forEach(p => p.remove());
+    if (!sqEl) {
+      resetBoardVisualState();
+    }
   }
 });
 
 document.addEventListener('mouseup', (e) => {
+  document.body.classList.remove('dragging-active');
+  document.querySelectorAll('.chess-piece.is-dragging, .piece.is-dragging').forEach(p => {
+    p.classList.remove('is-dragging');
+  });
+  const floating = document.querySelector('.piece.dragging');
+  if (floating) floating.remove();
+
   if (e.button === 2 && window.arrowStartSquare) {
     const sqEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('.square');
     if (sqEl) {

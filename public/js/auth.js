@@ -28,6 +28,13 @@ const Auth = {
     document.getElementById('auth-modal')?.addEventListener('click', (e) => {
       if (e.target.id === 'auth-modal') this.closeModal();
     });
+
+    document.getElementById('forgot-modal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'forgot-modal') document.getElementById('forgot-modal').classList.add('hidden');
+    });
+    document.getElementById('forgot-modal-close')?.addEventListener('click', () => {
+      document.getElementById('forgot-modal').classList.add('hidden');
+    });
   },
 
   showLoginModal() {

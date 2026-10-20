@@ -44,9 +44,9 @@ Create a server in Pelican Panel configured for your hardware allocation:
 ### 3. Configure Database & Startup Variables
 In your server's **Startup** tab:
 - `SUBDOMAIN`: `chess.isyourrefrigerator.online`
-- `STOCKFISH_MAX_DEPTH`: `8`
-- `STOCKFISH_HASH_MB`: `256`
-- `STOCKFISH_THREADS`: `1`
+- `STOCKFISH_MAX_DEPTH`: `16` (configurable between 1–64)
+- `STOCKFISH_HASH_MB`: `512` (configurable between 16–32768 MB)
+- `STOCKFISH_THREADS`: `2` (configurable between 1–64 CPU threads)
 - `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`: (Paste from the server's **Databases** tab)
 
 ---

@@ -168,7 +168,8 @@ router.post('/store', optionalAuth, async (req, res) => {
 // POST /api/analysis/game — Analyze a full game PGN and store inside database
 router.post('/game', optionalAuth, async (req, res) => {
   try {
-    let { pgn, invite_code, game_id, force } = req.body;
+    let { pgn, invite_code, game_id, force, depth } = req.body;
+    const reqDepth = depth ? parseInt(depth) : undefined;
 
     let game = null;
     if (invite_code) {
@@ -240,7 +241,7 @@ router.post('/game', optionalAuth, async (req, res) => {
       try {
         // Get evaluation before the move
         const evalResult = isStockfish
-          ? await stockfish.evaluate(fen, 8, 800)
+          ? await stockfish.evaluate(fen, reqDepth, 800)
           : { score: calcMaterial(evalChess), bestmove: null };
         const currentEval = evalResult.score;
 
@@ -367,8 +368,9 @@ router.post('/game', optionalAuth, async (req, res) => {
 // POST /api/analysis/evaluate — Evaluate a single position
 router.post('/evaluate', async (req, res) => {
   try {
-    const { fen } = req.body;
+    const { fen, depth } = req.body;
     if (!fen) return res.status(400).json({ error: 'FEN required' });
+    const evalDepth = depth ? parseInt(depth) : undefined;
 
     if (!stockfish.isAvailable()) {
       const c = new Chess(fen);
@@ -385,7 +387,7 @@ router.post('/evaluate', async (req, res) => {
       return res.json({ fen, eval: evalScore, scoreType: 'cp', mate: null, bestmove: null });
     }
 
-    const result = await stockfish.evaluate(fen, 8, 400);
+    const result = await stockfish.evaluate(fen, evalDepth, 400);
     res.json({
       fen,
       eval: result.score,
