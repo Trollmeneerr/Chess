@@ -162,7 +162,7 @@ body:not(.dragging-active) .square .piece {
   bottom: 2px;
   right: 2px;
   cursor: nwse-resize;
-  z-index: 50;
+  z-index: var(--z-floating-controls, 50);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -257,7 +257,7 @@ body:not(.dragging-active) .square .piece {
   line-height: 1;
   pointer-events: none;
   user-select: none;
-  z-index: 2;
+  z-index: var(--z-board-highlights, 12);
   opacity: 0.85;
 }
 
@@ -288,7 +288,7 @@ body:not(.dragging-active) .square .piece {
   background: rgba(245, 158, 11, 0.34) !important;
   box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.55);
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--z-board-highlights, 12);
 }
 
 /* Selected square - Glowing Cyan outline */
@@ -299,7 +299,7 @@ body:not(.dragging-active) .square .piece {
   background: rgba(56, 189, 248, 0.28);
   box-shadow: inset 0 0 0 3px rgba(56, 189, 248, 0.85);
   pointer-events: none;
-  z-index: 1;
+  z-index: var(--z-board-highlights, 12);
 }
 
 /* Legal move dots - Chess.com disk */
@@ -311,7 +311,7 @@ body:not(.dragging-active) .square .piece {
   border-radius: 50%;
   background: rgba(15, 23, 42, 0.38);
   pointer-events: none;
-  z-index: 2;
+  z-index: var(--z-board-highlights, 12);
 }
 
 /* Legal capture ring - Chess.com ring */
@@ -324,7 +324,7 @@ body:not(.dragging-active) .square .piece {
   border: 4px solid rgba(15, 23, 42, 0.38);
   background: transparent;
   pointer-events: none;
-  z-index: 2;
+  z-index: var(--z-board-highlights, 12);
 }
 
 /* King in Check Highlight */
@@ -352,7 +352,7 @@ body:not(.dragging-active) .square .piece {
   right: 3px;
   width: 24px;
   height: 24px;
-  z-index: 15;
+  z-index: var(--z-board-badge, 30);
   pointer-events: none;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
   animation: badgePop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
@@ -379,7 +379,7 @@ body:not(.dragging-active) .square .piece {
   background: rgba(34, 197, 94, 0.36);
   box-shadow: inset 0 0 0 2px rgba(34, 197, 94, 0.75);
   pointer-events: none;
-  z-index: 2;
+  z-index: var(--z-board-notes, 15);
 }
 
 .square.highlight-cyan::after,
@@ -390,7 +390,7 @@ body:not(.dragging-active) .square .piece {
   background: rgba(59, 130, 246, 0.35);
   box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.75);
   pointer-events: none;
-  z-index: 2;
+  z-index: var(--z-board-notes, 15);
 }
 
 .square.highlight-red::after {
@@ -400,7 +400,7 @@ body:not(.dragging-active) .square .piece {
   background: rgba(239, 68, 68, 0.35);
   box-shadow: inset 0 0 0 2px rgba(239, 68, 68, 0.75);
   pointer-events: none;
-  z-index: 2;
+  z-index: var(--z-board-notes, 15);
 }
 
 /* --- SVG Piece Styling (exact user requested class & rules) --- */
@@ -420,7 +420,7 @@ body:not(.dragging-active) .square .piece {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 3;
+  z-index: var(--z-pieces, 20);
   pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
@@ -439,7 +439,7 @@ body:not(.dragging-active) .square .piece {
 /* Dragging piece clone */
 .piece.dragging {
   position: fixed;
-  z-index: 1000;
+  z-index: var(--z-board-drag, 40);
   pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
@@ -460,7 +460,7 @@ body:not(.dragging-active) .square .piece {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 10;
+  z-index: var(--z-board-arrows, 25);
 }
 
 /* Edge Coordinates (fallback if enabled) */

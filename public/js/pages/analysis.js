@@ -606,6 +606,13 @@ const AnalysisPage = {
       this.evaluations.push({ cp: cpVal, mate: m.mate || null });
     });
 
+    // Keep core game review history strictly immutable
+    try {
+      Object.freeze(this.fens);
+      Object.freeze(this.moves);
+      Object.freeze(this.evaluations);
+    } catch (e) {}
+
     workspace.innerHTML = `
       <!-- Top Action & DB Status Header Bar -->
       <div class="review-header-bar glass-panel">
@@ -796,6 +803,7 @@ const AnalysisPage = {
 
     // Header buttons
     document.getElementById('btn-back-to-selector')?.addEventListener('click', () => {
+      this.cleanup();
       this.renderSelectorView();
     });
 
@@ -885,7 +893,7 @@ const AnalysisPage = {
 
     // Return to game line button
     document.getElementById('btn-return-game-line')?.addEventListener('click', () => {
-      const basePly = this.explorationBasePly;
+      const basePly = this.variationBasePly !== null && this.variationBasePly !== undefined ? this.variationBasePly : this.currentPlyIndex;
       this.exitExploration();
       this.jumpToPly(basePly);
     });
@@ -904,9 +912,21 @@ const AnalysisPage = {
     };
   },
 
+  getCurrentVariationPath() {
+    if (!this.isExploring || !this.currentVariationId) return [];
+    const path = [];
+    let curr = this.variationTree ? this.variationTree[this.currentVariationId] : null;
+    while (curr && curr.id !== 'root') {
+      path.unshift(curr);
+      curr = this.variationTree[curr.parentId];
+    }
+    return path;
+  },
+
   getCurrentBoardFen() {
-    if (this.isExploring && this.explorationHistory.length > 0) {
-      return this.explorationHistory[this.explorationHistory.length - 1].fen;
+    if (this.isExploring && this.currentVariationId && this.variationTree) {
+      const node = this.variationTree[this.currentVariationId];
+      if (node && node.fen) return node.fen;
     }
     return this.fens[this.currentPlyIndex] || AppConfig.INITIAL_FEN;
   },
@@ -914,22 +934,6 @@ const AnalysisPage = {
   handleBoardMove(from, to, promo = '') {
     const currentFen = this.getCurrentBoardFen();
     if (!currentFen || typeof window.Chess !== 'function') return false;
-
-    let chess = null;
-    try {
-      chess = new window.Chess(currentFen);
-    } catch (e) {
-      return false;
-    }
-
-    let moveResult = null;
-    try {
-      moveResult = chess.move({ from, to, promotion: promo || 'q' });
-    } catch (e) {
-      return false;
-    }
-
-    if (!moveResult) return false;
 
     // Check if player played the actual next move of the game review
     if (!this.isExploring && this.currentPlyIndex < this.moves.length) {
@@ -943,22 +947,99 @@ const AnalysisPage = {
       }
     }
 
-    // Player made a deviation / alternative line move (Chess.com style exploration)
+    // Initialize variation tree rooted at current ply if not already exploring
     if (!this.isExploring) {
       this.isExploring = true;
-      this.explorationBasePly = this.currentPlyIndex;
-      this.explorationHistory = [];
+      this.variationBasePly = this.currentPlyIndex;
+      this.nodeIdCounter = 0;
+      this.variationTree = {
+        root: {
+          id: 'root',
+          parentId: null,
+          from: null,
+          to: null,
+          promotion: null,
+          san: '',
+          fen: currentFen,
+          captured: false,
+          inCheck: false,
+          ply: 0,
+          children: []
+        }
+      };
+      this.currentVariationId = 'root';
     }
 
+    const currentNode = (this.variationTree && this.variationTree[this.currentVariationId]) || this.variationTree.root;
+
+    // Check if an existing branch child already matches this exact move
+    const promotionPiece = promo || 'q';
+    const existingChildId = currentNode.children.find(childId => {
+      const c = this.variationTree[childId];
+      return c && c.from === from && c.to === to && (c.promotion || 'q') === promotionPiece;
+    });
+
+    if (existingChildId) {
+      // Re-visit existing branch without overwriting
+      this.currentVariationId = existingChildId;
+      const targetNode = this.variationTree[existingChildId];
+      ChessBoard.update(targetNode.fen, {
+        lastMove: { from: targetNode.from, to: targetNode.to },
+        inCheck: targetNode.inCheck
+      });
+
+      if (typeof playChessSound === 'function') {
+        const soundType = targetNode.inCheck ? 'check' : (targetNode.captured ? 'capture' : 'move');
+        playChessSound(soundType);
+      }
+
+      this.updateExplorationUI();
+
+      if (typeof runStockfishMultiPV === 'function') {
+        runStockfishMultiPV(targetNode.fen, 20);
+      } else if (typeof evaluatePositionWithWorker === 'function') {
+        evaluatePositionWithWorker(targetNode.fen);
+      }
+      return true;
+    }
+
+    // Deep-clone state by instantiating a completely new chess.js object using the current FEN
+    let chess = null;
+    try {
+      chess = new window.Chess(currentNode.fen);
+    } catch (e) {
+      return false;
+    }
+
+    let moveResult = null;
+    try {
+      moveResult = chess.move({ from, to, promotion: promotionPiece });
+    } catch (e) {
+      return false;
+    }
+
+    if (!moveResult) return false;
+
+    // Create a new branch node in variation tree — keeps all lines preserved
     const newFen = chess.fen();
-    this.explorationHistory.push({
+    const newNodeId = 'vnode_' + (++this.nodeIdCounter);
+    const newNode = {
+      id: newNodeId,
+      parentId: currentNode.id,
       from,
       to,
+      promotion: promotionPiece,
       san: moveResult.san,
       fen: newFen,
       captured: Boolean(moveResult.captured),
-      inCheck: chess.in_check()
-    });
+      inCheck: chess.in_check(),
+      ply: currentNode.ply + 1,
+      children: []
+    };
+
+    this.variationTree[newNodeId] = newNode;
+    currentNode.children.push(newNodeId);
+    this.currentVariationId = newNodeId;
 
     // Update board display
     ChessBoard.update(newFen, {
@@ -966,7 +1047,7 @@ const AnalysisPage = {
       inCheck: chess.in_check()
     });
 
-    // Play chess knock sound
+    // Play chess sound
     if (typeof playChessSound === 'function') {
       const soundType = chess.in_check() ? 'check' : (moveResult.captured ? 'capture' : 'move');
       playChessSound(soundType);
@@ -975,7 +1056,7 @@ const AnalysisPage = {
     // Update exploration bar UI
     this.updateExplorationUI();
 
-    // Stream real-time Stockfish MultiPV for the new position!
+    // Stream real-time Stockfish MultiPV for the new position
     if (typeof runStockfishMultiPV === 'function') {
       runStockfishMultiPV(newFen, 20);
     } else if (typeof evaluatePositionWithWorker === 'function') {
@@ -995,10 +1076,10 @@ const AnalysisPage = {
 
     expBar.classList.remove('hidden');
 
-    // Build SAN move line for the variation
+    const path = this.getCurrentVariationPath();
     let lineStr = '';
-    this.explorationHistory.forEach((m, idx) => {
-      const plyNum = this.explorationBasePly + idx;
+    path.forEach((m, idx) => {
+      const plyNum = (this.variationBasePly || 0) + idx;
       const moveNum = Math.floor(plyNum / 2) + 1;
       const isBlack = (plyNum % 2 === 1);
 
@@ -1010,36 +1091,39 @@ const AnalysisPage = {
       }
     });
 
-    expText.textContent = lineStr.trim();
+    expText.textContent = lineStr.trim() || 'Variation root';
     if (stepInd) {
-      stepInd.textContent = `Variation (+${this.explorationHistory.length} ply)`;
+      stepInd.textContent = `Variation (+${path.length} ply)`;
     }
   },
 
   exitExploration() {
     this.isExploring = false;
-    this.explorationHistory = [];
+    this.variationTree = {};
+    this.currentVariationId = null;
+    this.variationBasePly = null;
     const expBar = document.getElementById('analysis-exploration-bar');
     if (expBar) expBar.classList.add('hidden');
   },
 
   stepBackward() {
-    if (this.isExploring && this.explorationHistory.length > 0) {
-      this.explorationHistory.pop();
-      if (this.explorationHistory.length === 0) {
-        const basePly = this.explorationBasePly;
-        this.exitExploration();
-        this.jumpToPly(basePly);
-      } else {
-        const prev = this.explorationHistory[this.explorationHistory.length - 1];
-        ChessBoard.update(prev.fen, {
-          lastMove: { from: prev.from, to: prev.to },
-          inCheck: prev.inCheck
+    if (this.isExploring && this.currentVariationId && this.variationTree) {
+      const curr = this.variationTree[this.currentVariationId];
+      if (curr && curr.parentId && curr.parentId !== 'root') {
+        this.currentVariationId = curr.parentId;
+        const parent = this.variationTree[curr.parentId];
+        ChessBoard.update(parent.fen, {
+          lastMove: parent.from && parent.to ? { from: parent.from, to: parent.to } : null,
+          inCheck: parent.inCheck
         });
         this.updateExplorationUI();
         if (typeof runStockfishMultiPV === 'function') {
-          runStockfishMultiPV(prev.fen, 20);
+          runStockfishMultiPV(parent.fen, 20);
         }
+      } else {
+        const basePly = this.variationBasePly !== null && this.variationBasePly !== undefined ? this.variationBasePly : this.currentPlyIndex;
+        this.exitExploration();
+        this.jumpToPly(basePly);
       }
     } else {
       this.jumpToPly(Math.max(0, this.currentPlyIndex - 1));
@@ -1047,12 +1131,39 @@ const AnalysisPage = {
   },
 
   stepForward() {
-    if (this.isExploring) {
-      const nextPly = this.explorationBasePly + 1;
+    if (this.isExploring && this.currentVariationId && this.variationTree) {
+      const curr = this.variationTree[this.currentVariationId];
+      if (curr && curr.children && curr.children.length > 0) {
+        const nextId = curr.children[0];
+        this.currentVariationId = nextId;
+        const nextNode = this.variationTree[nextId];
+        ChessBoard.update(nextNode.fen, {
+          lastMove: { from: nextNode.from, to: nextNode.to },
+          inCheck: nextNode.inCheck
+        });
+        this.updateExplorationUI();
+        if (typeof runStockfishMultiPV === 'function') {
+          runStockfishMultiPV(nextNode.fen, 20);
+        }
+        return;
+      }
+      const nextPly = (this.variationBasePly || 0) + 1;
       this.exitExploration();
       this.jumpToPly(Math.min(this.moves.length, nextPly));
     } else {
       this.jumpToPly(Math.min(this.moves.length, this.currentPlyIndex + 1));
+    }
+  },
+
+  cleanup() {
+    this.exitExploration();
+    window.onkeydown = null;
+    if (window.stockfishWorker) {
+      try {
+        window.stockfishWorker.postMessage('stop');
+      } catch (e) {
+        console.warn('[Analysis] Error stopping Stockfish worker:', e);
+      }
     }
   },
 

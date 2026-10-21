@@ -1,20 +1,22 @@
 /**
- * Timezone Utility — CET/CEST Offset Correction (-2h) & User Localization
- * Specifically addresses the bug where 2 hours need to be subtracted to reflect the correct local time.
+ * Timezone Utility — Native UTC Localization (Intl.DateTimeFormat & Date.toLocaleString)
+ * Fixes the CET/CEST DST bug by eliminating manual 2-hour offset additions/subtractions.
+ * All backend timestamps are strictly UTC ISO 8601 strings.
+ * The browser natively converts UTC to local time (or user's selected IANA timezone).
  */
 
 /**
- * Parses a date string and subtracts 2 hours to correct the inverted CET/CEST offset bug.
- * @param {string|Date|number} dateInput - Raw timestamp from server/db
- * @returns {Date|null} Corrected Date object
+ * Parses a UTC date string into a native Date object without manual hour offsets.
+ * @param {string|Date|number} dateInput - Raw UTC timestamp (ISO 8601 or SQL UTC format)
+ * @returns {Date|null} Native Date object in UTC
  */
 export function parseAndCorrectTimestamp(dateInput) {
   if (!dateInput) return null;
   let date;
   if (typeof dateInput === 'string') {
     const normalized = dateInput.includes('T')
-      ? dateInput
-      : dateInput.replace(' ', 'T') + (dateInput.endsWith('Z') ? '' : 'Z');
+      ? (dateInput.endsWith('Z') ? dateInput : `${dateInput}Z`)
+      : `${dateInput.replace(' ', 'T')}${dateInput.endsWith('Z') ? '' : 'Z'}`;
     date = new Date(normalized);
     if (isNaN(date.getTime())) {
       date = new Date(dateInput);
@@ -24,39 +26,39 @@ export function parseAndCorrectTimestamp(dateInput) {
   }
 
   if (isNaN(date.getTime())) return null;
-
-  // Subtract 2 hours (2 * 3600 * 1000 ms) to correct inverted CET/CEST offset
-  return new Date(date.getTime() - (2 * 60 * 60 * 1000));
+  return date;
 }
 
 /**
- * Formats a UTC timestamp into the user's local timezone with offset correction applied.
- * @param {string|Date} dateInput - Raw timestamp
- * @param {string} userTimezoneId - IANA timezone (e.g. 'Europe/Amsterdam')
- * @returns {string} Formatted localized string
+ * Formats a UTC timestamp into the user's local timezone natively using Intl.DateTimeFormat or Date.toLocaleString().
+ * @param {string|Date} dateInput - Raw UTC timestamp
+ * @param {string} [userTimezoneId] - Optional IANA timezone (e.g. 'Europe/Amsterdam'). If not provided, defaults to user's native browser timezone.
+ * @returns {string} Localized date and time string
  */
-export function formatTimestampForUser(dateInput, userTimezoneId = 'UTC') {
+export function formatTimestampForUser(dateInput, userTimezoneId) {
   if (!dateInput) return '';
   const date = parseAndCorrectTimestamp(dateInput);
   if (!date) return '';
-  const tz = userTimezoneId || 'UTC';
-  try {
-    return date.toLocaleString('en-GB', {
-      timeZone: tz,
-      dateStyle: 'medium',
-      timeStyle: 'short'
-    });
-  } catch (err) {
-    return date.toLocaleString('en-GB', {
-      dateStyle: 'medium',
-      timeStyle: 'short'
-    });
+
+  const options = {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  };
+
+  if (userTimezoneId && userTimezoneId !== 'UTC' && userTimezoneId !== 'local') {
+    try {
+      return new Intl.DateTimeFormat(undefined, { ...options, timeZone: userTimezoneId }).format(date);
+    } catch (err) {
+      // Fall through to native local conversion
+    }
   }
+
+  return date.toLocaleString(undefined, options);
 }
 
 /**
- * Relative time-ago formatter with offset correction.
- * @param {string|Date} dateInput
+ * Relative time-ago formatter based on true UTC timestamps.
+ * @param {string|Date} dateInput - Raw UTC timestamp
  * @returns {string} e.g. "Just now", "5m ago", "2h ago", "1d ago"
  */
 export function formatTimeAgo(dateInput) {

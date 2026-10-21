@@ -493,8 +493,9 @@ function populateTimezoneSelect(selectElementId, savedTimezone = null) {
 }
 
 /**
- * Correct inverted CET/CEST (+2/-2 hour) timestamp offset.
- * Fixes the timestamp logic where the timezones were inverted, subtracting 2 hours to reflect accurate local time.
+ * Parse UTC timestamp into native Date object.
+ * Eliminates the CET/CEST manual 2-hour offset arithmetic bug.
+ * Timestamps from the database are strictly in UTC; browser natively converts them to local time.
  */
 function parseAndCorrectTimestamp(dateInput) {
   if (!dateInput) return null;
@@ -502,8 +503,8 @@ function parseAndCorrectTimestamp(dateInput) {
   if (typeof dateInput === 'string') {
     // Normalise SQL date strings like "2026-10-21 20:30:00" to ISO UTC string
     const normalized = dateInput.includes('T')
-      ? dateInput
-      : dateInput.replace(' ', 'T') + (dateInput.endsWith('Z') ? '' : 'Z');
+      ? (dateInput.endsWith('Z') ? dateInput : `${dateInput}Z`)
+      : `${dateInput.replace(' ', 'T')}${dateInput.endsWith('Z') ? '' : 'Z'}`;
     date = new Date(normalized);
     if (isNaN(date.getTime())) {
       date = new Date(dateInput);
@@ -513,28 +514,27 @@ function parseAndCorrectTimestamp(dateInput) {
   }
 
   if (isNaN(date.getTime())) return null;
-
-  // Subtract 2 hours (2 * 3600 * 1000 ms) to correct the inverted CET/CEST offset bug
-  return new Date(date.getTime() - (2 * 60 * 60 * 1000));
+  return date;
 }
 
-function formatTimestampForUser(utcDateString, userTimezoneId = 'UTC') {
+function formatTimestampForUser(utcDateString, userTimezoneId) {
   if (!utcDateString) return '';
   const date = parseAndCorrectTimestamp(utcDateString);
   if (!date) return '';
-  const tz = userTimezoneId || 'UTC';
-  try {
-    return date.toLocaleString('en-GB', {
-      timeZone: tz,
-      dateStyle: 'medium',
-      timeStyle: 'short'
-    });
-  } catch (err) {
-    return date.toLocaleString('en-GB', {
-      dateStyle: 'medium',
-      timeStyle: 'short'
-    });
+  const options = {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  };
+
+  if (userTimezoneId && userTimezoneId !== 'UTC' && userTimezoneId !== 'local') {
+    try {
+      return new Intl.DateTimeFormat(undefined, { ...options, timeZone: userTimezoneId }).format(date);
+    } catch (err) {
+      // Fall through to native local conversion
+    }
   }
+
+  return date.toLocaleString(undefined, options);
 }
 
 /**

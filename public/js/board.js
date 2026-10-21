@@ -713,18 +713,9 @@ const ChessBoard = {
       if (targetSquare && targetSquare !== dragInfo.from) {
         if (this.isMyTurn()) {
           if (this.legalMoves.includes(targetSquare)) {
-            // Optimistic DOM placement on target square so piece never disappears
-            const originSq = document.querySelector(`[data-square="${dragInfo.from}"]`);
-            const targetSqEl = document.querySelector(`[data-square="${targetSquare}"]`);
-            const pieceEl = originSq?.querySelector('.chess-piece, .piece');
-
-            if (originSq && targetSqEl && pieceEl) {
-              const captured = targetSqEl.querySelector('.chess-piece, .piece');
-              if (captured) captured.remove();
-              pieceEl.classList.remove('is-dragging');
-              targetSqEl.appendChild(pieceEl);
-            }
-
+            // Strict one-way data flow: The UI requests a move from the engine.
+            // If the move is valid, the engine updates its FEN and passes it to the UI to render.
+            // If invalid, the UI immediately snaps the piece back to its original square based on this.fen.
             this.tryMove(dragInfo.from, targetSquare);
             return;
           }
@@ -739,19 +730,13 @@ const ChessBoard = {
             to: targetSquare,
             promotion: isPromo ? 'q' : undefined
           };
-          this.selectedSquare = null;
-          this.legalMoves = [];
-          this.render();
-          this.bindEvents();
+          this.snapBack();
           return;
         }
       }
 
-      // Snap-back: Illegal move, off-board, or dropped on same square
-      this.selectedSquare = null;
-      this.legalMoves = [];
-      this.render();
-      this.bindEvents();
+      // Snap-back: Illegal move, off-board, or dropped on same square based on valid current FEN
+      this.snapBack();
       return;
     }
 
@@ -761,6 +746,13 @@ const ChessBoard = {
     document.querySelectorAll('.chess-piece.is-dragging, .piece.is-dragging').forEach(p => {
       p.classList.remove('is-dragging');
     });
+  },
+
+  snapBack() {
+    this.selectedSquare = null;
+    this.legalMoves = [];
+    this.render();
+    this.bindEvents();
   },
 
   selectSquare(square, isPremove = false) {
@@ -1026,23 +1018,25 @@ const ChessBoard = {
       return;
     }
 
-    this.lastMove = { from, to };
-    this.boardEl?.querySelectorAll('.square.last-move-from, .square.last-move-to').forEach(el => {
-      el.classList.remove('last-move-from', 'last-move-to');
-    });
-    this.boardEl?.querySelector(`[data-square="${from}"]`)?.classList.add('last-move-from');
-    this.boardEl?.querySelector(`[data-square="${to}"]`)?.classList.add('last-move-to');
-
     if (this.onMove) {
-      this.onMove({ from, to });
+      const result = this.onMove({ from, to });
+      if (result === false) {
+        // Immediate rejection: snap back to current valid FEN
+        this.snapBack();
+        return;
+      }
     }
     this.selectedSquare = null;
     this.legalMoves = [];
   },
 
   showPromotionModal(from, to) {
-    const modal = document.getElementById('promotion-modal');
+    let modal = document.getElementById('promotion-modal');
     if (!modal) return;
+    // Ensure promotion modal sits directly in document.body so it is never constrained by board stacking context
+    if (modal.parentElement !== document.body) {
+      document.body.appendChild(modal);
+    }
     modal.classList.remove('hidden');
 
     const turn = this.getTurn();
@@ -1059,10 +1053,7 @@ const ChessBoard = {
 
     const cancelHandler = () => {
       cleanup();
-      this.selectedSquare = null;
-      this.legalMoves = [];
-      this.render();
-      this.bindEvents();
+      this.snapBack();
     };
 
     const overlayHandler = (e) => {
@@ -1087,15 +1078,13 @@ const ChessBoard = {
       const fn = () => {
         const promotion = btn.dataset.piece;
         cleanup();
-        this.lastMove = { from, to };
-        this.boardEl?.querySelectorAll('.square.last-move-from, .square.last-move-to').forEach(el => {
-          el.classList.remove('last-move-from', 'last-move-to');
-        });
-        this.boardEl?.querySelector(`[data-square="${from}"]`)?.classList.add('last-move-from');
-        this.boardEl?.querySelector(`[data-square="${to}"]`)?.classList.add('last-move-to');
 
         if (this.onMove) {
-          this.onMove({ from, to, promotion });
+          const promoResult = this.onMove({ from, to, promotion });
+          if (promoResult === false) {
+            this.snapBack();
+            return;
+          }
         }
         this.selectedSquare = null;
         this.legalMoves = [];

@@ -385,10 +385,12 @@ const BotsPage = {
       });
 
       // Initial Stockfish evaluation
+      this.currentFen = data.fen;
       this.updateEvaluation(data.fen);
     });
 
     this.socket.on('move_made', (data) => {
+      this.currentFen = data.fen;
       ChessBoard.update(data.fen, {
         lastMove: { from: data.move.from, to: data.move.to },
         inCheck: data.isCheck,
@@ -406,6 +408,7 @@ const BotsPage = {
     });
 
     this.socket.on('bot_move', (data) => {
+      this.currentFen = data.fen;
       ChessBoard.update(data.fen, {
         lastMove: { from: data.move.from, to: data.move.to },
         inCheck: data.isCheck,
@@ -424,6 +427,24 @@ const BotsPage = {
 
     this.socket.on('game_over', (data) => {
       this.handleGameOver(data);
+    });
+
+    this.socket.on('error', (err) => {
+      console.warn('[Bots] Error:', err?.message || err);
+      if (this.currentFen) {
+        ChessBoard.update(this.currentFen);
+      } else {
+        ChessBoard.snapBack?.();
+      }
+    });
+
+    this.socket.on('invalid_move', () => {
+      console.warn('[Bots] Invalid move rejected');
+      if (this.currentFen) {
+        ChessBoard.update(this.currentFen);
+      } else {
+        ChessBoard.snapBack?.();
+      }
     });
 
     document.getElementById('btn-bot-resign')?.addEventListener('click', () => {

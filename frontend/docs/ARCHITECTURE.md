@@ -92,7 +92,8 @@ Any component (e.g. `ChessBoardComponent` or `PostGameModalComponent`) can be sw
 
 ---
 
-## 5. Timezone Bug Fix (CET/CEST -2h Offset Correction)
-- Fixes the bug where timezones were inverted (+2/-2 hour offset).
-- The `parseAndCorrectTimestamp` utility parses SQL/ISO timestamps and subtracts 2 hours (`- (2 * 60 * 60 * 1000) ms`) before formatting via `Intl.DateTimeFormat(..., { timeZone: userTimezoneId })`.
-- All match history rows, time-ago counters, and user join dates now accurately display the player's true local time.
+## 5. Timezone Standardization & Native Browser Localization
+- Eliminates manual 2-hour offset arithmetic that previously caused daylight saving time (DST) bugs during CET/CEST transitions.
+- The backend database and API routes store and transmit all timestamps strictly in UTC ISO 8601 format (`YYYY-MM-DDTHH:MM:SSZ`).
+- The frontend `parseAndCorrectTimestamp` utility parses the UTC timestamp, and `formatTimestampForUser` uses `Intl.DateTimeFormat` or `Date.toLocaleString()` to natively convert to the user's local timezone (or selected IANA timezone).
+- All match history rows, time-ago counters, and user join dates accurately reflect the player's true local time across all timezones and DST periods.

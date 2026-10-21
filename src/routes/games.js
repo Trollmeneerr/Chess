@@ -6,6 +6,7 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 const { authMiddleware, optionalAuth } = require('../middleware/auth');
+const { toIsoUtc } = require('../utils/time');
 
 // POST /api/games/create — Create a new PvP or Bot match
 router.post('/create', authMiddleware, async (req, res) => {
@@ -202,7 +203,7 @@ router.get('/history/me', authMiddleware, async (req, res) => {
         white_accuracy: whiteAccuracy,
         black_accuracy: blackAccuracy,
         pgn: g.pgn,
-        created_at: g.created_at
+        created_at: toIsoUtc(g.created_at)
       };
     });
 

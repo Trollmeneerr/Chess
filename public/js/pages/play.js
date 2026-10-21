@@ -414,7 +414,21 @@ const PlayPage = {
     });
 
     this.socket.on('error', (err) => {
-      console.warn('[PvP] Error:', err.message);
+      console.warn('[PvP] Move rejected / error:', err?.message || err);
+      if (this.currentGame?.fen) {
+        ChessBoard.update(this.currentGame.fen);
+      } else {
+        ChessBoard.snapBack?.();
+      }
+    });
+
+    this.socket.on('invalid_move', () => {
+      console.warn('[PvP] Invalid move rejected');
+      if (this.currentGame?.fen) {
+        ChessBoard.update(this.currentGame.fen);
+      } else {
+        ChessBoard.snapBack?.();
+      }
     });
 
     // Chat form
@@ -481,6 +495,10 @@ const PlayPage = {
   },
 
   handleMoveMade(data) {
+    if (this.currentGame) {
+      this.currentGame.fen = data.fen;
+      this.currentGame.turn = data.turn;
+    }
     ChessBoard.update(data.fen, {
       lastMove: { from: data.move.from, to: data.move.to },
       inCheck: data.isCheck,

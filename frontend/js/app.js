@@ -346,6 +346,11 @@ const App = {
       item.classList.toggle('active', p === page || (page === 'lobby' && p === 'lobby'));
     });
 
+    // Clean up previous page resources (e.g. Analysis Stockfish worker and event listeners)
+    if (page !== 'analysis') {
+      window.AnalysisPage?.cleanup?.();
+    }
+
     // Render corresponding page module
     switch (page) {
       case 'lobby':

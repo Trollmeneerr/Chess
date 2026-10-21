@@ -6,6 +6,7 @@ const router = express.Router();
 const db = require('../db');
 const { authMiddleware, optionalAuth } = require('../middleware/auth');
 const { getBotByElo } = require('../engine/bots');
+const { toIsoUtc } = require('../utils/time');
 
 // GET /api/users/profile/:username — Detailed profile with match history and stats
 router.get('/profile/:username', optionalAuth, async (req, res) => {
@@ -15,6 +16,7 @@ router.get('/profile/:username', optionalAuth, async (req, res) => {
       [req.params.username]
     );
     if (!user) return res.status(404).json({ error: 'User not found' });
+    user.created_at = toIsoUtc(user.created_at);
 
     // Fetch games for this user (both PvP and PvE)
     const games = await db.all(
@@ -109,7 +111,7 @@ router.get('/profile/:username', optionalAuth, async (req, res) => {
         opponent_elo: opponentElo,
         move_count: moveCount,
         pgn: g.pgn,
-        created_at: g.created_at
+        created_at: toIsoUtc(g.created_at)
       };
     });
 
@@ -257,7 +259,11 @@ router.get('/friends', authMiddleware, async (req, res) => {
       [userId]
     );
 
-    res.json({ friends, incoming, outgoing });
+    const formattedFriends = friends.map(f => ({ ...f, friendship_date: toIsoUtc(f.friendship_date) }));
+    const formattedIncoming = incoming.map(r => ({ ...r, created_at: toIsoUtc(r.created_at) }));
+    const formattedOutgoing = outgoing.map(r => ({ ...r, created_at: toIsoUtc(r.created_at) }));
+
+    res.json({ friends: formattedFriends, incoming: formattedIncoming, outgoing: formattedOutgoing });
   } catch (err) {
     console.error('[Users] Get friends error:', err);
     res.status(500).json({ error: 'Failed to retrieve friends list' });

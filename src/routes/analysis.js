@@ -9,6 +9,7 @@ const db = require('../db');
 const { v4: uuidv4 } = require('uuid');
 const { optionalAuth } = require('../middleware/auth');
 const { getBotByElo } = require('../engine/bots');
+const { toIsoUtc } = require('../utils/time');
 
 // GET /api/analysis/game/:identifier — Retrieve stored review from database for any node or client
 router.get('/game/:identifier', optionalAuth, async (req, res) => {
@@ -61,7 +62,7 @@ router.get('/game/:identifier', optionalAuth, async (req, res) => {
       bot_elo: game.bot_elo,
       result: game.result,
       pgn: game.pgn,
-      created_at: game.created_at,
+      created_at: toIsoUtc(game.created_at),
       has_analysis: Boolean(parsedAnalysis),
       analysis: parsedAnalysis,
       cached: Boolean(parsedAnalysis),
@@ -126,7 +127,7 @@ router.get('/stored', optionalAuth, async (req, res) => {
         white_accuracy: whiteAcc,
         black_accuracy: blackAcc,
         moves: moveCount,
-        created_at: g.created_at
+        created_at: toIsoUtc(g.created_at)
       };
     });
 

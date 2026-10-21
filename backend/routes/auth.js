@@ -6,6 +6,7 @@ const router = express.Router();
 const argon2 = require('argon2');
 const db = require('../db');
 const { generateToken, authMiddleware } = require('../middleware/auth');
+const { toIsoUtc } = require('../utils/time');
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
@@ -137,6 +138,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       [req.user.id]
     );
     if (!user) return res.status(404).json({ error: 'User not found' });
+    user.created_at = toIsoUtc(user.created_at);
     res.json({ user });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
