@@ -101,6 +101,20 @@
   min-height: 320px;
 }
 
+#app.nav-collapsed .chess-board {
+  width: var(--board-custom-size, min(750px, calc(100vw - 32px), 82vh));
+  height: var(--board-custom-size, min(750px, calc(100vw - 32px), 82vh));
+}
+
+@media (max-width: 768px) {
+  .chess-board {
+    width: min(calc(100vw - 20px), 94vw, 76vh) !important;
+    height: min(calc(100vw - 20px), 94vw, 76vh) !important;
+    min-width: min(280px, calc(100vw - 16px)) !important;
+    min-height: min(280px, calc(100vw - 16px)) !important;
+  }
+}
+
 /* Blue Chess.com Theme & Board Mechanics */
 :root {
   --bg-main: #0f172a;

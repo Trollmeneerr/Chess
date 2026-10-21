@@ -220,6 +220,9 @@ const PlayPage = {
   },
 
   renderLiveMatch(inviteCode) {
+    if (window.App && typeof window.App.setSidebarCollapsed === 'function') {
+      window.App.setSidebarCollapsed(true);
+    }
     const main = document.getElementById('main-content');
 
     main.innerHTML = `

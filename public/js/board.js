@@ -1026,6 +1026,13 @@ const ChessBoard = {
       return;
     }
 
+    this.lastMove = { from, to };
+    this.boardEl?.querySelectorAll('.square.last-move-from, .square.last-move-to').forEach(el => {
+      el.classList.remove('last-move-from', 'last-move-to');
+    });
+    this.boardEl?.querySelector(`[data-square="${from}"]`)?.classList.add('last-move-from');
+    this.boardEl?.querySelector(`[data-square="${to}"]`)?.classList.add('last-move-to');
+
     if (this.onMove) {
       this.onMove({ from, to });
     }
@@ -1080,6 +1087,13 @@ const ChessBoard = {
       const fn = () => {
         const promotion = btn.dataset.piece;
         cleanup();
+        this.lastMove = { from, to };
+        this.boardEl?.querySelectorAll('.square.last-move-from, .square.last-move-to').forEach(el => {
+          el.classList.remove('last-move-from', 'last-move-to');
+        });
+        this.boardEl?.querySelector(`[data-square="${from}"]`)?.classList.add('last-move-from');
+        this.boardEl?.querySelector(`[data-square="${to}"]`)?.classList.add('last-move-to');
+
         if (this.onMove) {
           this.onMove({ from, to, promotion });
         }
