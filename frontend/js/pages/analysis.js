@@ -797,6 +797,11 @@ const AnalysisPage = {
       onMove: (attempt) => this.handleBoardMove(attempt.from, attempt.to, attempt.promotion)
     });
 
+    // Initialize background Stockfish 16.1 MultiPV worker for live position evaluations
+    if (typeof window.initStockfishMultiPV === 'function') {
+      window.initStockfishMultiPV(this.fens[0] || AppConfig.INITIAL_FEN);
+    }
+
     this.renderMovesGrid(moves);
     this.bindAnalysisControls(moves);
     this.jumpToPly(0);

@@ -75,14 +75,14 @@ function syncAnalysisToPly(plyIndex, fens, moves, evaluations) {
     updateEvaluationBar(currentEval.cp, currentEval.mate);
   }
 
-  // 4. If playedMove was a mistake/blunder/inaccuracy/misplay, show best move from preMoveFen
+  // 4. If playedMove was a mistake/blunder/inaccuracy/misplay, show best move from preMoveFen (Purple in analysis)
   const altUci = playedMove?.bestAlternativeUci || playedMove?.bestMove || playedMove?.bestmove;
   if (playedMove && MISPLAY_TYPES.has(playedMove.classification) && altUci && altUci.length >= 4) {
     if (typeof drawMoveArrowFixed === 'function') {
       drawMoveArrowFixed(
         altUci.slice(0, 2),
         altUci.slice(2, 4),
-        '#3b82f6',
+        '#a855f7',
         true
       );
     }

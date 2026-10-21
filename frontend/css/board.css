@@ -345,6 +345,131 @@ body:not(.dragging-active) .square .piece {
   background-color: rgba(239, 68, 68, 0.45) !important;
 }
 
+/* ==========================================================================
+   Analysis Mode Scoped Theme: Classic Lighter Palette & Purple Annotations
+   (Applied to Analysis Mode ONLY - Play, Bots, & Puzzles stay untouched)
+   ========================================================================== */
+
+/* Classic Lighter Palette for Analysis Only */
+.analysis-layout,
+.chess-board.is-analysis,
+#chess-board-grid.is-analysis {
+  --board-light: #f0d9b5;
+  --board-dark: #b58863;
+}
+
+.analysis-layout .square-light,
+.chess-board.is-analysis .square-light,
+#chess-board-grid.is-analysis .square-light {
+  background: #f0d9b5 !important;
+}
+
+.analysis-layout .square-dark,
+.chess-board.is-analysis .square-dark,
+#chess-board-grid.is-analysis .square-dark {
+  background: #b58863 !important;
+}
+
+.analysis-layout .square-light .coord-in-square,
+.chess-board.is-analysis .square-light .coord-in-square,
+#chess-board-grid.is-analysis .square-light .coord-in-square {
+  color: #b58863 !important;
+}
+
+.analysis-layout .square-dark .coord-in-square,
+.chess-board.is-analysis .square-dark .coord-in-square,
+#chess-board-grid.is-analysis .square-dark .coord-in-square {
+  color: #f0d9b5 !important;
+}
+
+/* Purple Highlighted Squares for Analysis Only */
+.analysis-layout .square.last-move-from::before,
+.analysis-layout .square.last-move-to::before,
+.chess-board.is-analysis .square.last-move-from::before,
+.chess-board.is-analysis .square.last-move-to::before,
+#chess-board-grid.is-analysis .square.last-move-from::before,
+#chess-board-grid.is-analysis .square.last-move-to::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(168, 85, 247, 0.42) !important;
+  box-shadow: inset 0 0 0 2px rgba(168, 85, 247, 0.75) !important;
+  pointer-events: none;
+  z-index: var(--z-board-highlights, 12);
+}
+
+.analysis-layout .square.selected::before,
+.chess-board.is-analysis .square.selected::before,
+#chess-board-grid.is-analysis .square.selected::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(168, 85, 247, 0.35) !important;
+  box-shadow: inset 0 0 0 3px rgba(192, 132, 252, 0.9) !important;
+  pointer-events: none;
+  z-index: var(--z-board-highlights, 12);
+}
+
+.analysis-layout .square.highlight-analysis,
+.analysis-layout .square.analysis-from,
+.analysis-layout .square.analysis-to,
+.chess-board.is-analysis .square.highlight-analysis,
+.chess-board.is-analysis .square.analysis-from,
+.chess-board.is-analysis .square.analysis-to,
+#chess-board-grid.is-analysis .square.highlight-analysis,
+#chess-board-grid.is-analysis .square.analysis-from,
+#chess-board-grid.is-analysis .square.analysis-to {
+  background-color: rgba(168, 85, 247, 0.45) !important;
+  box-shadow: inset 0 0 0 2px rgba(168, 85, 247, 0.75) !important;
+}
+
+.analysis-layout .square.highlight-green:not(.legal-move):not(.legal-capture)::after,
+.analysis-layout .square.note-green:not(.legal-move):not(.legal-capture)::after,
+.chess-board.is-analysis .square.highlight-green:not(.legal-move):not(.legal-capture)::after,
+.chess-board.is-analysis .square.note-green:not(.legal-move):not(.legal-capture)::after,
+#chess-board-grid.is-analysis .square.highlight-green:not(.legal-move):not(.legal-capture)::after,
+#chess-board-grid.is-analysis .square.note-green:not(.legal-move):not(.legal-capture)::after,
+.analysis-layout .square.highlight-cyan::after,
+.analysis-layout .square.highlight-blue::after,
+.chess-board.is-analysis .square.highlight-cyan::after,
+.chess-board.is-analysis .square.highlight-blue::after,
+#chess-board-grid.is-analysis .square.highlight-cyan::after,
+#chess-board-grid.is-analysis .square.highlight-blue::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(168, 85, 247, 0.42) !important;
+  box-shadow: inset 0 0 0 2px rgba(168, 85, 247, 0.8) !important;
+  pointer-events: none;
+  z-index: var(--z-board-notes, 15);
+}
+
+/* Purple Legal Move Indicators for Analysis Only */
+.analysis-layout .square.legal-move::after,
+.chess-board.is-analysis .square.legal-move::after,
+#chess-board-grid.is-analysis .square.legal-move::after {
+  background: rgba(168, 85, 247, 0.45) !important;
+}
+
+.analysis-layout .square.legal-capture::after,
+.chess-board.is-analysis .square.legal-capture::after,
+#chess-board-grid.is-analysis .square.legal-capture::after {
+  border-color: rgba(168, 85, 247, 0.6) !important;
+}
+
+/* Purple Move & Annotation Arrows for Analysis Only */
+.analysis-layout .board-arrows-layer path,
+.chess-board.is-analysis .board-arrows-layer path,
+#chess-board-grid.is-analysis .board-arrows-layer path {
+  stroke: #a855f7 !important;
+}
+
+.analysis-layout .board-arrows-layer marker polygon,
+.chess-board.is-analysis .board-arrows-layer marker polygon,
+#chess-board-grid.is-analysis .board-arrows-layer marker polygon {
+  fill: #a855f7 !important;
+}
+
 /* Evaluation Classification Badges on Squares & Move List */
 .square-eval-badge {
   position: absolute;

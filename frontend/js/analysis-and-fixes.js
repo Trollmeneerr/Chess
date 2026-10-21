@@ -146,12 +146,24 @@ function drawMoveArrowFixed(fromSq, toSq, color = '#3b82f6', isBestMove = false)
   const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
   if (!svg) return;
 
+  const isNote = (color === '#22c55e');
+
+  // Ephemeral Analysis Mode: Make all arrows purple (#a855f7) per user specification
+  const isAnalysisMode = Boolean(
+    (window.ChessBoard && window.ChessBoard.isAnalysis) ||
+    document.querySelector('.analysis-layout') ||
+    document.querySelector('#chess-board-grid.is-analysis') ||
+    (window.AnalysisPage && window.AnalysisPage.isExploring !== undefined)
+  );
+
+  const activeColor = isAnalysisMode ? '#a855f7' : color;
+
   const start = getSquareCenterCoords(fromSq);
   const end = getSquareCenterCoords(toSq);
   const dx = end.col - start.col;
   const dy = end.row - start.row;
 
-  const cleanColor = color.replace(/[^a-zA-Z0-9]/g, '');
+  const cleanColor = activeColor.replace(/[^a-zA-Z0-9]/g, '');
   const markerId = `arrowhead-${cleanColor}`;
 
   let defs = svg.querySelector('defs');
@@ -171,12 +183,11 @@ function drawMoveArrowFixed(fromSq, toSq, color = '#3b82f6', isBestMove = false)
     marker.setAttribute('orient', 'auto');
     const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
     poly.setAttribute('points', '0 0.5, 3.8 2, 0 3.5');
-    poly.setAttribute('fill', color);
+    poly.setAttribute('fill', activeColor);
     marker.appendChild(poly);
     defs.appendChild(marker);
   }
 
-  const isNote = (color === '#22c55e');
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   const isKnight = (Math.abs(dx) === 1 && Math.abs(dy) === 2) || (Math.abs(dx) === 2 && Math.abs(dy) === 1);
 
@@ -189,7 +200,7 @@ function drawMoveArrowFixed(fromSq, toSq, color = '#3b82f6', isBestMove = false)
   }
 
   path.setAttribute('fill', 'none');
-  path.setAttribute('stroke', color);
+  path.setAttribute('stroke', activeColor);
   path.setAttribute('stroke-width', isBestMove ? '20' : (isNote ? '14' : '16'));
   path.setAttribute('stroke-linecap', 'round');
   path.setAttribute('stroke-linejoin', 'round');
@@ -210,8 +221,8 @@ function drawMoveArrowFixed(fromSq, toSq, color = '#3b82f6', isBestMove = false)
   // Preserve engine arrows in ChessBoard state so they persist across board re-renders
   if (!isNote && window.ChessBoard) {
     if (!window.ChessBoard.engineArrows) window.ChessBoard.engineArrows = [];
-    if (!window.ChessBoard.engineArrows.some(a => a.from === fromSq && a.to === toSq && a.color === color)) {
-      window.ChessBoard.engineArrows.push({ from: fromSq, to: toSq, color, isBestMove });
+    if (!window.ChessBoard.engineArrows.some(a => a.from === fromSq && a.to === toSq && a.color === activeColor)) {
+      window.ChessBoard.engineArrows.push({ from: fromSq, to: toSq, color: activeColor, isBestMove });
     }
   }
 }
@@ -364,12 +375,12 @@ function renderAnalysisMoveStep(moveHistory, idx) {
     : (currentMove.eval !== undefined ? Math.round(currentMove.eval * 100) : 0);
   updateEvaluationBar(cpVal, currentMove.mate);
 
-  // If player made an inaccuracy/mistake/blunder, draw the Blue Best Move arrow
+  // If player made an inaccuracy/mistake/blunder, draw the Purple Best Move arrow
   const bestMove = currentMove.bestMove || currentMove.bestmove;
   if (['inaccuracy', 'mistake', 'blunder'].includes(currentMove.classification) && bestMove && bestMove.length >= 4) {
     const bestFrom = bestMove.slice(0, 2);
     const bestTo = bestMove.slice(2, 4);
-    drawMoveArrowFixed(bestFrom, bestTo, '#3b82f6', true);
+    drawMoveArrowFixed(bestFrom, bestTo, '#a855f7', true);
   }
 
   // Stream Top 3 lines for this position using Stockfish WebWorker hook
@@ -434,7 +445,7 @@ function updateEngineLineUI(multipvIndex, scoreText, pvMovesString, rawUciString
       if (firstUci && firstUci.length >= 4) {
         const from = firstUci.slice(0, 2);
         const to = firstUci.slice(2, 4);
-        drawMoveArrowFixed(from, to, '#3b82f6', true);
+        drawMoveArrowFixed(from, to, '#a855f7', true);
         if (window.AnalysisPage && window.AnalysisPage.isExploring !== undefined) {
           window.AnalysisPage.handleBoardMove(from, to, firstUci[4] || '');
         }

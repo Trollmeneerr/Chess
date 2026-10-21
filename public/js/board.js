@@ -171,7 +171,7 @@ const ChessBoard = {
       }
     }
 
-    let html = '<div class="chess-board" id="chess-board-grid">';
+    let html = `<div class="chess-board${this.isAnalysis ? ' is-analysis' : ''}" id="chess-board-grid">`;
 
     const ranks = this.orientation === 'white'
       ? [7, 6, 5, 4, 3, 2, 1, 0]
@@ -791,9 +791,10 @@ const ChessBoard = {
     } else {
       svg.querySelectorAll('path[data-engine="true"]').forEach(p => p.remove());
     }
+    const defaultColor = this.isAnalysis ? '#a855f7' : '#3b82f6';
     for (const arrow of (this.engineArrows || [])) {
       if (typeof window.drawMoveArrowFixed === 'function') {
-        window.drawMoveArrowFixed(arrow.from, arrow.to, arrow.color || '#3b82f6', arrow.isBestMove || false);
+        window.drawMoveArrowFixed(arrow.from, arrow.to, this.isAnalysis ? '#a855f7' : (arrow.color || defaultColor), arrow.isBestMove || false);
       }
     }
   },
@@ -807,14 +808,24 @@ const ChessBoard = {
     } else {
       svg.querySelectorAll('path[data-note="true"]').forEach(p => p.remove());
     }
+    const noteColor = this.isAnalysis ? '#a855f7' : '#22c55e';
     for (const arrow of (this.notes?.arrows || this.arrows || [])) {
-      drawMoveArrow(arrow.from, arrow.to, '#22c55e', false);
+      if (typeof window.drawMoveArrowFixed === 'function') {
+        window.drawMoveArrowFixed(arrow.from, arrow.to, noteColor, false);
+      } else {
+        drawMoveArrow(arrow.from, arrow.to, noteColor, false);
+      }
     }
   },
 
   renderArrowPreview(fromSq, toSq) {
     this.renderNotes();
-    drawMoveArrow(fromSq, toSq, '#22c55e', false);
+    const previewColor = this.isAnalysis ? '#a855f7' : '#22c55e';
+    if (typeof window.drawMoveArrowFixed === 'function') {
+      window.drawMoveArrowFixed(fromSq, toSq, previewColor, false);
+    } else {
+      drawMoveArrow(fromSq, toSq, previewColor, false);
+    }
   },
 
   clearArrowPreview() {
