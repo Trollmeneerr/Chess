@@ -83,6 +83,10 @@ function startSeededMultiMovePuzzle(puzzlePool, seed = Date.now()) {
     window.puzzleState.reward = 1;
     window.puzzleState.isFinished = false;
   }
+  if (window.PuzzlesPage) {
+    window.PuzzlesPage.inActivePuzzle = true;
+    window.PuzzlesPage.isFinished = false;
+  }
 
   updatePuzzleRewardBadge();
 

@@ -298,6 +298,20 @@ async function endBotGame(socket, game, winner, reason) {
   } else if (winner === 'player' && game.moveCount < 10) {
     // Game too short — no ELO awarded
     eloChange = 0;
+  } else if (winner === 'bot') {
+    // Player lost against bot — deduct ELO based on expected score against bot rating
+    try {
+      const user = await db.get('SELECT elo_rating FROM users WHERE id = ?', [game.playerId]);
+      const playerElo = user?.elo_rating || 800;
+      const expectedPlayer = 1 / (1 + Math.pow(10, (game.botElo - playerElo) / 400));
+      // Expected score for player is expectedPlayer, actual score is 0.
+      // Standard K=32 matches PvP calculation. Ensure at least -1 deduction.
+      eloChange = Math.min(-1, Math.round(32 * (0 - expectedPlayer)));
+      const newElo = Math.max(100, playerElo + eloChange);
+      await db.run('UPDATE users SET elo_rating = ? WHERE id = ?', [newElo, game.playerId]);
+    } catch (err) {
+      console.error('[Bot] Failed to calculate and update Elo for bot defeat:', err);
+    }
   }
 
   // Save game

@@ -93,7 +93,7 @@ const ProfilePage = {
     const lossPct = totalGames > 0 ? (losses / totalGames) * 100 : 0;
 
     const joinDate = user.created_at
-      ? new Date(user.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short' })
+      ? (typeof parseAndCorrectTimestamp === 'function' ? parseAndCorrectTimestamp(user.created_at) : new Date(user.created_at)).toLocaleDateString(undefined, { year: 'numeric', month: 'short' })
       : 'Oct 2026';
 
     const defeatedSet = new Set(stats.defeated_bosses || []);
@@ -293,10 +293,10 @@ const ProfilePage = {
   },
 
   renderMatchesList(games, filter = 'all') {
-    let filtered = games;
-    if (filter === 'pvp') filtered = games.filter(g => g.game_type === 'pvp');
-    else if (filter === 'bot') filtered = games.filter(g => g.game_type === 'bot');
-    else if (filter === 'win') filtered = games.filter(g => g.outcome === 'win');
+    let filtered = (games || []).filter(g => g.game_type !== 'analysis');
+    if (filter === 'pvp') filtered = filtered.filter(g => g.game_type === 'pvp');
+    else if (filter === 'bot') filtered = filtered.filter(g => g.game_type === 'bot');
+    else if (filter === 'win') filtered = filtered.filter(g => g.outcome === 'win');
 
     if (!filtered || filtered.length === 0) {
       return `
@@ -457,7 +457,10 @@ const ProfilePage = {
               (${game.opponent_elo || 'Bot'}) • Result: <span style="color:${resultColor};font-weight:700;">${game.result}</span>
             </div>
           </div>
-          <button class="btn btn-outline btn-sm" id="btn-replay-open-analysis">Review with Stockfish 🔍</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline btn-sm" id="btn-replay-copy-pgn">📋 Copy Moves</button>
+            <button class="btn btn-outline btn-sm" id="btn-replay-open-analysis">Review with Stockfish 🔍</button>
+          </div>
         </div>
 
         <div class="replay-body mt-3">
@@ -529,6 +532,12 @@ const ProfilePage = {
         modal.classList.add('hidden');
       }
     };
+
+    document.getElementById('btn-replay-copy-pgn')?.addEventListener('click', (e) => {
+      if (typeof copyMovesToClipboard === 'function') {
+        copyMovesToClipboard(game.pgn, e.currentTarget);
+      }
+    });
 
     document.getElementById('btn-replay-open-analysis')?.addEventListener('click', () => {
       clearInterval(this.replayAutoPlayTimer);
@@ -621,8 +630,11 @@ const ProfilePage = {
 
   formatTimeAgo(dateString) {
     if (!dateString) return '';
-    const date = new Date(dateString);
-    const sec = Math.floor((Date.now() - date.getTime()) / 1000);
+    const date = typeof parseAndCorrectTimestamp === 'function'
+      ? parseAndCorrectTimestamp(dateString)
+      : new Date(dateString);
+    if (!date) return '';
+    const sec = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
     if (sec < 60) return 'Just now';
     const min = Math.floor(sec / 60);
     if (min < 60) return `${min}m ago`;

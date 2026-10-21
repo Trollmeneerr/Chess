@@ -1,0 +1,77 @@
+/**
+ * Puzzle Seeder CLI Tool
+ * Can be run to seed puzzles into the database
+ * Usage: node src/cli/seed-puzzles.js [csv_file_path]
+ */
+const fs = require('fs');
+const readline = require('readline');
+const path = require('path');
+const db = require('../db');
+const { STARTER_PUZZLES } = require('../engine/starter-puzzles');
+
+async function main() {
+  await db.initialize();
+  console.log('[Seed] DB initialized');
+
+  const args = process.argv.slice(2);
+  const csvPath = args[0];
+
+  if (csvPath && fs.existsSync(csvPath)) {
+    console.log(`[Seed] Streaming puzzles from CSV: ${csvPath}`);
+    const fileStream = fs.createReadStream(csvPath);
+    const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+
+    let count = 0;
+    let isHeader = true;
+
+    for await (const line of rl) {
+      if (isHeader) {
+        isHeader = false;
+        continue;
+      }
+
+      // Lichess puzzle CSV format: PuzzleId,FEN,Moves,Rating,RatingDeviation,Popularity,NbPlays,Themes,GameUrl,OpeningTags
+      const parts = line.split(',');
+      if (parts.length >= 8) {
+        const puzzleId = parts[0];
+        const fen = parts[1];
+        const moves = parts[2] ? parts[2].trim() : '';
+        const rating = parseInt(parts[3]) || 1200;
+        const themes = parts[7] || '';
+        const popularity = parseInt(parts[5]) || 0;
+
+        // Strict multi-move filter: moves.split(' ').length >= 6 (at least 3 player moves + 3 opponent moves)
+        if (!moves || moves.split(/\s+/).length < 6) {
+          continue;
+        }
+
+        try {
+          await db.insert(
+            'INSERT OR IGNORE INTO puzzles (puzzle_id, fen, moves, rating, themes, popularity) VALUES (?, ?, ?, ?, ?, ?)',
+            [puzzleId, fen, moves, rating, themes, popularity]
+          );
+          count++;
+          if (count % 5000 === 0) {
+            console.log(`[Seed] Seeded ${count} puzzles...`);
+          }
+        } catch (e) {
+          // ignore duplicate
+        }
+      }
+    }
+    console.log(`[Seed] Finished seeding ${count} puzzles from CSV.`);
+  } else {
+    const targetArg = args.find(a => a.startsWith('--target='));
+    const target = targetArg ? parseInt(targetArg.split('=')[1], 10) : 1000;
+    console.log(`[Seed] Running fast bulk puzzle importer (target: ${target} per tier)...`);
+    const { runImport } = require('../../scripts/import-puzzles');
+    await runImport(target);
+  }
+
+  process.exit(0);
+}
+
+main().catch(err => {
+  console.error('[Seed] Error:', err);
+  process.exit(1);
+});

@@ -529,10 +529,14 @@ const BotsPage = {
     const isDraw = data.winner === 'draw' || data.result === '1/2-1/2';
 
     let title = isDraw ? 'Draw Game' : (isWinner ? 'Victory!' : 'Defeat');
-    let eloClass = data.eloChange > 0 ? 'positive' : 'neutral';
-    let eloText = data.eloChange > 0 ? `+${data.eloChange} ELO` : (data.moveCount < 10 ? 'Game too short (<10 moves): No rating awarded' : 'No rating change');
+    let eloClass = data.eloChange > 0 ? 'positive' : (data.eloChange < 0 ? 'negative' : 'neutral');
+    let eloText = data.eloChange > 0
+      ? `+${data.eloChange} ELO`
+      : (data.eloChange < 0
+          ? `${data.eloChange} ELO`
+          : (data.moveCount < 10 ? 'Game too short (<10 moves): No rating awarded' : 'No rating change'));
 
-    if (isWinner && Auth.currentUser && data.newElo) {
+    if (Auth.currentUser && data.newElo !== undefined && data.newElo !== null) {
       Auth.currentUser.elo_rating = data.newElo;
       if (data.botsDefeated) Auth.currentUser.bots_defeated = data.botsDefeated;
       Auth.updateUI();
@@ -562,6 +566,7 @@ const BotsPage = {
           <div class="elo-change ${eloClass}">${eloText}</div>
           <div class="game-over-actions">
             <button class="btn btn-primary" id="btn-bot-review">Game Review</button>
+            <button class="btn btn-outline" id="btn-bot-copy-moves">📋 Copy Moves</button>
             <button class="btn btn-ghost" id="btn-bot-rematch">Rematch</button>
             <button class="btn btn-ghost" data-action="play-bots">Roster</button>
           </div>
@@ -571,6 +576,13 @@ const BotsPage = {
 
       document.getElementById('btn-bot-review')?.addEventListener('click', () => {
         App.navigateTo('analysis', { pgn: data.pgn, inviteCode: this.activeGame?.gameId });
+      });
+
+      document.getElementById('btn-bot-copy-moves')?.addEventListener('click', (e) => {
+        const pgnToCopy = data.pgn || window.lastFinishedGame?.pgn || '';
+        if (typeof copyMovesToClipboard === 'function') {
+          copyMovesToClipboard(pgnToCopy, e.currentTarget);
+        }
       });
 
       document.getElementById('btn-bot-rematch')?.addEventListener('click', () => {

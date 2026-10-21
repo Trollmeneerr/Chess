@@ -2175,3 +2175,171 @@
   line-height: 1.4;
 }
 
+/* --- Chess.com Style Puzzles Landing Dashboard --- */
+.puzzles-landing-wrap {
+  max-width: 1180px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.puzzles-landing-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .puzzles-landing-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.puzzles-hero-card {
+  padding: 36px 32px;
+  border-radius: var(--radius-lg, 16px);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.7) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 0 24px rgba(56, 189, 248, 0.1);
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.puzzles-hero-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.puzzles-hero-title {
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0 0 6px 0;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
+.puzzles-hero-desc {
+  font-size: 14px;
+  color: var(--text-secondary, #94a3b8);
+  margin: 0;
+  max-width: 580px;
+  line-height: 1.6;
+}
+
+.start-puzzle-hero-btn {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  padding: 16px 36px !important;
+  border-radius: 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 50%, #38bdf8 100%) !important;
+  color: #fff !important;
+  border: none !important;
+  cursor: pointer !important;
+  box-shadow: 0 8px 24px -4px rgba(14, 165, 233, 0.5), 0 0 16px rgba(56, 189, 248, 0.3) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.start-puzzle-hero-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 32px -4px rgba(14, 165, 233, 0.7), 0 0 24px rgba(56, 189, 248, 0.5) !important;
+}
+
+.start-puzzle-hero-btn:active {
+  transform: translateY(1px);
+}
+
+.puzzles-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.diff-tier-card {
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diff-tier-card:hover {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(30, 41, 59, 0.7);
+  transform: translateY(-2px);
+}
+
+.diff-tier-card.active {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.12);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
+}
+
+.diff-tier-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.diff-tier-name {
+  font-weight: 700;
+  font-size: 15px;
+  color: #fff;
+}
+
+.diff-tier-card.active .diff-tier-name {
+  color: #38bdf8;
+}
+
+.diff-tier-range {
+  font-size: 12px;
+  color: var(--text-muted, #64748b);
+  font-family: var(--font-mono, monospace);
+}
+
+.diff-tier-desc {
+  font-size: 12px;
+  color: var(--text-secondary, #94a3b8);
+  line-height: 1.4;
+}
+
+.diff-tier-active-check {
+  display: none;
+  color: #38bdf8;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.diff-tier-card.active .diff-tier-active-check {
+  display: inline-block;
+}
+
+.puzzles-board-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  margin-bottom: 16px;
+  border-radius: var(--radius-md, 10px);
+}
+
+/* Copy button feedback */
+.btn-copied-success {
+  background: rgba(34, 197, 94, 0.2) !important;
+  border-color: #22c55e !important;
+  color: #4ade80 !important;
+}
+
+

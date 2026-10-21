@@ -621,6 +621,9 @@ const AnalysisPage = {
         </div>
 
         <div class="review-header-actions">
+          <button class="btn btn-outline btn-sm" id="btn-copy-moves" title="Copy standard chess notation / PGN">
+            📋 Copy Moves
+          </button>
           <button class="btn btn-ghost btn-sm" id="btn-copy-code" title="Copy match invite code">
             📋 Copy Code
           </button>
@@ -777,6 +780,13 @@ const AnalysisPage = {
     // Header buttons
     document.getElementById('btn-back-to-selector')?.addEventListener('click', () => {
       this.renderSelectorView();
+    });
+
+    document.getElementById('btn-copy-moves')?.addEventListener('click', (e) => {
+      const pgnToCopy = this.pgn || data.pgn || '';
+      if (typeof copyMovesToClipboard === 'function') {
+        copyMovesToClipboard(pgnToCopy, e.currentTarget);
+      }
     });
 
     document.getElementById('btn-copy-code')?.addEventListener('click', () => {
@@ -972,8 +982,11 @@ const AnalysisPage = {
 
   formatTimeAgo(dateString) {
     if (!dateString) return '';
-    const date = new Date(dateString);
-    const sec = Math.floor((Date.now() - date.getTime()) / 1000);
+    const date = typeof parseAndCorrectTimestamp === 'function'
+      ? parseAndCorrectTimestamp(dateString)
+      : new Date(dateString);
+    if (!date) return '';
+    const sec = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
     if (sec < 60) return 'Just now';
     const min = Math.floor(sec / 60);
     if (min < 60) return `${min}m ago`;

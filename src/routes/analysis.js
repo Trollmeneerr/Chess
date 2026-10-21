@@ -351,8 +351,8 @@ router.post('/game', optionalAuth, async (req, res) => {
       // Create new game record in DB so it is permanently stored for nodes
       savedInviteCode = 'rev_' + uuidv4().replace(/-/g, '').substring(0, 8);
       await db.insert(
-        'INSERT INTO games (invite_code, white_id, black_id, game_type, pgn, result, analysis_json) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [savedInviteCode, req.user?.id || null, null, 'analysis', pgn, '*', jsonToStore]
+        'INSERT INTO games (invite_code, white_id, black_id, game_type, pgn, result, analysis_json) VALUES (?, NULL, NULL, ?, ?, ?, ?)',
+        [savedInviteCode, 'analysis', pgn, '*', jsonToStore]
       );
     }
 

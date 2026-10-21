@@ -1,0 +1,27 @@
+{
+  "name": "refrigerator-chess-backend",
+  "version": "1.0.0",
+  "description": "Refrigerator Chess — Decoupled Backend Service",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "reset-pass": "node cli/reset-password.js",
+    "seed-puzzles": "node cli/seed-puzzles.js",
+    "fix-db": "node cli/fix-db.js"
+  },
+  "dependencies": {
+    "argon2": "^0.43.0",
+    "better-sqlite3": "^11.0.0",
+    "chess.js": "^1.0.0-beta.8",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.14.0",
+    "socket.io": "^4.8.0",
+    "uuid": "^11.1.0"
+  }
+}

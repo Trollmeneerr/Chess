@@ -25,7 +25,7 @@ router.get('/profile/:username', optionalAuth, async (req, res) => {
        FROM games g
        LEFT JOIN users w ON g.white_id = w.id
        LEFT JOIN users b ON g.black_id = b.id
-       WHERE (g.white_id = ? OR g.black_id = ?) AND g.result IS NOT NULL
+       WHERE (g.white_id = ? OR g.black_id = ?) AND g.result IS NOT NULL AND g.game_type IN ('pvp', 'bot')
        ORDER BY g.created_at DESC LIMIT 50`,
       [user.id, user.id]
     );

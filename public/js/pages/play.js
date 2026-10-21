@@ -658,6 +658,7 @@ const PlayPage = {
           ${eloHtml}
           <div class="game-over-actions">
             <button class="btn btn-primary" id="btn-review-game">Game Review</button>
+            <button class="btn btn-outline" id="btn-copy-moves">📋 Copy Moves</button>
             <button class="btn btn-ghost" data-action="play-online">New Match</button>
           </div>
         </div>
@@ -666,6 +667,13 @@ const PlayPage = {
 
       document.getElementById('btn-review-game')?.addEventListener('click', () => {
         App.navigateTo('analysis', { inviteCode, pgn: data.pgn });
+      });
+
+      document.getElementById('btn-copy-moves')?.addEventListener('click', (e) => {
+        const pgnToCopy = data.pgn || window.lastFinishedGame?.pgn || this.currentGame?.pgn || '';
+        if (typeof copyMovesToClipboard === 'function') {
+          copyMovesToClipboard(pgnToCopy, e.currentTarget);
+        }
       });
     }
   },

@@ -5,9 +5,12 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "start:backend": "node backend/server.js",
+    "start:frontend": "echo 'Frontend is component-based and served by backend'",
     "dev": "node --watch src/server.js",
+    "dev:backend": "node --watch backend/server.js",
     "update": "node src/updater.js",
-    "build": "echo 'No build step needed - vanilla JS'",
+    "build": "echo 'No build step needed - modular plug-and-play components'",
     "reset-pass": "node src/cli/reset-password.js",
     "seed-puzzles": "node scripts/import-puzzles.js",
     "import:puzzles": "node scripts/import-puzzles.js",

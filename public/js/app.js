@@ -48,6 +48,7 @@ const App = {
       !window.BotsPage.isGameOver;
 
     const isPuzzleActive = this.currentPage === 'puzzles' &&
+      window.PuzzlesPage?.inActivePuzzle === true &&
       Boolean(window.puzzleState?.currentPuzzle || window.PuzzlesPage?.currentPuzzle || window.puzzleController?.puzzle) &&
       !window.puzzleState?.isFinished &&
       !window.PuzzlesPage?.isFinished &&
@@ -119,6 +120,7 @@ const App = {
 
     // 3. Check Tactical Puzzle
     const isPuzzleActive = this.currentPage === 'puzzles' &&
+      window.PuzzlesPage?.inActivePuzzle === true &&
       Boolean(window.puzzleState?.currentPuzzle || window.PuzzlesPage?.currentPuzzle || window.puzzleController?.puzzle) &&
       !window.puzzleState?.isFinished &&
       !window.PuzzlesPage?.isFinished &&

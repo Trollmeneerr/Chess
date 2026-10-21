@@ -178,8 +178,10 @@ function loadSeededPuzzle(verifiedPuzzles, seed = Date.now()) {
   puzzleState.solutionIndex = 1;
   puzzleState.penaltyCount = 0;
   puzzleState.reward = 1;
-  puzzleState.isFinished = false;
-  if (window.PuzzlesPage) window.PuzzlesPage.isFinished = false;
+  if (window.PuzzlesPage) {
+    window.PuzzlesPage.inActivePuzzle = true;
+    window.PuzzlesPage.isFinished = false;
+  }
   updatePuzzleRewardUI();
 
   // Determine player color: Initial FEN turn indicates who makes the setup blunder
@@ -474,22 +476,103 @@ function populateTimezoneSelect(selectElementId, savedTimezone = null) {
   ).join('');
 }
 
+/**
+ * Correct inverted CET/CEST (+2/-2 hour) timestamp offset.
+ * Fixes the timestamp logic where the timezones were inverted, subtracting 2 hours to reflect accurate local time.
+ */
+function parseAndCorrectTimestamp(dateInput) {
+  if (!dateInput) return null;
+  let date;
+  if (typeof dateInput === 'string') {
+    // Normalise SQL date strings like "2026-10-21 20:30:00" to ISO UTC string
+    const normalized = dateInput.includes('T')
+      ? dateInput
+      : dateInput.replace(' ', 'T') + (dateInput.endsWith('Z') ? '' : 'Z');
+    date = new Date(normalized);
+    if (isNaN(date.getTime())) {
+      date = new Date(dateInput);
+    }
+  } else {
+    date = new Date(dateInput);
+  }
+
+  if (isNaN(date.getTime())) return null;
+
+  // Subtract 2 hours (2 * 3600 * 1000 ms) to correct the inverted CET/CEST offset bug
+  return new Date(date.getTime() - (2 * 60 * 60 * 1000));
+}
+
 function formatTimestampForUser(utcDateString, userTimezoneId = 'UTC') {
   if (!utcDateString) return '';
+  const date = parseAndCorrectTimestamp(utcDateString);
+  if (!date) return '';
   const tz = userTimezoneId || 'UTC';
   try {
-    return new Date(utcDateString).toLocaleString('en-GB', {
+    return date.toLocaleString('en-GB', {
       timeZone: tz,
       dateStyle: 'medium',
       timeStyle: 'short'
     });
   } catch (err) {
-    return new Date(utcDateString).toLocaleString('en-GB', {
+    return date.toLocaleString('en-GB', {
       dateStyle: 'medium',
       timeStyle: 'short'
     });
   }
 }
+
+/**
+ * Copy standard chess notation / PGN to user clipboard with visual feedback
+ */
+function copyMovesToClipboard(pgnOrMoves, buttonElement) {
+  if (!pgnOrMoves) {
+    alert('No moves available to copy.');
+    return Promise.reject(new Error('Empty moves'));
+  }
+  const text = String(pgnOrMoves).trim();
+
+  const doCopy = () => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '0';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      return Promise.resolve();
+    } catch (err) {
+      document.body.removeChild(ta);
+      return Promise.reject(err);
+    }
+  };
+
+  return doCopy().then(() => {
+    if (buttonElement) {
+      const origText = buttonElement.innerHTML;
+      buttonElement.innerHTML = '✓ Copied Moves!';
+      buttonElement.classList.add('btn-copied-success');
+      setTimeout(() => {
+        buttonElement.innerHTML = origText;
+        buttonElement.classList.remove('btn-copied-success');
+      }, 2000);
+    }
+  }).catch(err => {
+    console.warn('[Clipboard] Copy failed:', err);
+    window.prompt('Copy game moves / PGN:', text);
+  });
+}
+
+window.parseAndCorrectTimestamp = parseAndCorrectTimestamp;
+window.formatTimestampForUser = formatTimestampForUser;
+window.copyMovesToClipboard = copyMovesToClipboard;
 
 /**
  * Save user timezone to backend and update local user session

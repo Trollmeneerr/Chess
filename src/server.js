@@ -85,8 +85,15 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 
 // Static files
-app.use(express.static(path.join(__dirname, '..', 'public')));
-app.use('/img', express.static(path.join(__dirname, '..', 'public', 'img')));
+const fs = require('fs');
+const frontendDir = path.join(__dirname, '..', 'frontend');
+const publicDir = path.join(__dirname, '..', 'public');
+
+if (fs.existsSync(frontendDir)) {
+  app.use(express.static(frontendDir));
+}
+app.use(express.static(publicDir));
+app.use('/img', express.static(path.join(publicDir, 'img')));
 app.use('/img', express.static(path.join(__dirname, 'img')));
 app.use('/.source/img', express.static(path.join(__dirname, '..', '.source', 'img')));
 app.use('/source/img', express.static(path.join(__dirname, '..', '.source', 'img')));
@@ -106,7 +113,11 @@ app.use('/api/analysis', analysisRoutes);
 
 // SPA fallback — serve index.html for all non-API routes
 app.use((req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  const frontendIndex = path.join(frontendDir, 'index.html');
+  if (fs.existsSync(frontendIndex)) {
+    return res.sendFile(frontendIndex);
+  }
+  res.sendFile(path.join(publicDir, 'index.html'));
 });
 
 // Socket handlers

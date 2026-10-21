@@ -8,16 +8,249 @@ const PuzzlesPage = {
   currentMoveIndex: 0,
   usedSolution: false,
   isFinished: false,
+  inActivePuzzle: false,
 
   render() {
+    this.inActivePuzzle = false;
+    this.currentPuzzle = null;
+    this.isFinished = true;
+    if (window.puzzleController) window.puzzleController.isCompleted = true;
+    if (window.puzzleState) window.puzzleState.isFinished = true;
+
+    this.renderLandingView();
+  },
+
+  renderLandingView() {
+    this.inActivePuzzle = false;
+    const main = document.getElementById('main-content');
+    const userRating = Auth.currentUser?.elo_rating || 800;
+    const puzzlesSolved = Auth.currentUser?.puzzles_solved || 0;
+
+    main.innerHTML = `
+      <div class="page puzzles-landing-wrap">
+        <div class="page-header" style="text-align:left;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+          <div>
+            <h1 class="page-title">Tactical Puzzles</h1>
+            <p class="page-subtitle">Sharpen your calculation skills with 4,000+ curated tactical positions (1,000+ per tier) & earn +1 ELO</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <span class="badge badge-accent" id="puzzle-pool-badge">4,000+ Active</span>
+            <span class="badge badge-success"><span class="pulse-dot"></span> Stockfish 16.1 Active</span>
+          </div>
+        </div>
+
+        <div class="puzzles-landing-grid">
+          <!-- Main Left Column: Hero & Difficulty Tier Cards -->
+          <div class="puzzles-landing-main">
+            <!-- Hero Card with Chess.com style Start Puzzle CTA -->
+            <div class="puzzles-hero-card">
+              <div class="puzzles-hero-header">
+                <div>
+                  <div class="badge badge-accent mb-2">TACTICAL TRAINING // OPT-IN</div>
+                  <h2 class="puzzles-hero-title">Solve Tactical Puzzles</h2>
+                  <p class="puzzles-hero-desc">
+                    Find the best moves in critical positions. ELO rating is <strong>safe on this dashboard</strong> and is only at risk once you actively begin a puzzle.
+                  </p>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                <button class="start-puzzle-hero-btn" id="btn-start-puzzle">
+                  <svg width="22" height="22" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>
+                  </svg>
+                  <span>Start Puzzle</span>
+                </button>
+                <div style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:6px;">
+                  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;"></span>
+                  Selected: <strong style="color:#fff;text-transform:capitalize;" id="selected-diff-label">${this.currentDifficulty}</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Difficulty Selection Cards (Chess.com Style) -->
+            <div class="glass-panel" style="padding:24px;border-radius:14px;margin-bottom:20px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <h3 style="margin:0;font-size:16px;font-weight:700;">Choose Difficulty Tier</h3>
+                <span style="font-size:12px;color:var(--text-muted);">Select before starting</span>
+              </div>
+              
+              <div class="puzzles-tier-grid">
+                <div class="diff-tier-card ${this.currentDifficulty === 'easy' ? 'active' : ''}" data-diff="easy">
+                  <div class="diff-tier-card-header">
+                    <span class="diff-tier-name">Easy</span>
+                    <span class="badge badge-subtle" id="count-easy" style="font-size:11px;">1,016</span>
+                  </div>
+                  <div class="diff-tier-range">Rating 400 – 999</div>
+                  <div class="diff-tier-desc">Hanging pieces, simple forks, and 1-move tactical checkmates.</div>
+                  <div class="diff-tier-active-check">✓ Active Tier</div>
+                </div>
+
+                <div class="diff-tier-card ${this.currentDifficulty === 'medium' ? 'active' : ''}" data-diff="medium">
+                  <div class="diff-tier-card-header">
+                    <span class="diff-tier-name">Medium</span>
+                    <span class="badge badge-subtle" id="count-medium" style="font-size:11px;">1,000</span>
+                  </div>
+                  <div class="diff-tier-range">Rating 1000 – 1399</div>
+                  <div class="diff-tier-desc">Pins, skewers, double attacks, and discovered threats.</div>
+                  <div class="diff-tier-active-check">✓ Active Tier</div>
+                </div>
+
+                <div class="diff-tier-card ${this.currentDifficulty === 'hard' ? 'active' : ''}" data-diff="hard">
+                  <div class="diff-tier-card-header">
+                    <span class="diff-tier-name">Hard</span>
+                    <span class="badge badge-subtle" id="count-hard" style="font-size:11px;">1,000</span>
+                  </div>
+                  <div class="diff-tier-range">Rating 1400 – 1899</div>
+                  <div class="diff-tier-desc">Piece sacrifices, deflections, and complex multi-ply lines.</div>
+                  <div class="diff-tier-active-check">✓ Active Tier</div>
+                </div>
+
+                <div class="diff-tier-card ${this.currentDifficulty === 'master' ? 'active' : ''}" data-diff="master">
+                  <div class="diff-tier-card-header">
+                    <span class="diff-tier-name">Master</span>
+                    <span class="badge badge-subtle" id="count-master" style="font-size:11px;">1,000</span>
+                  </div>
+                  <div class="diff-tier-range">Rating 1900+</div>
+                  <div class="diff-tier-desc">Grandmaster combinations, quiet moves, and deep calculations.</div>
+                  <div class="diff-tier-active-check">✓ Active Tier</div>
+                </div>
+
+                <div class="diff-tier-card ${this.currentDifficulty === 'adaptive' ? 'active' : ''}" data-diff="adaptive">
+                  <div class="diff-tier-card-header">
+                    <span class="diff-tier-name">Adaptive</span>
+                    <span class="badge badge-accent" style="font-size:11px;">Dynamic</span>
+                  </div>
+                  <div class="diff-tier-range">${userRating} ± 100 ELO</div>
+                  <div class="diff-tier-desc">Automatically adjusts to match your current skill level.</div>
+                  <div class="diff-tier-active-check">✓ Active Tier</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tactical Themes Showcase -->
+            <div class="glass-panel" style="padding:20px;border-radius:14px;">
+              <h4 style="margin:0 0 10px 0;font-size:14px;color:var(--text-secondary);">Included Tactical Motifs</h4>
+              <div class="puzzle-theme-tags" style="margin-top:0;">
+                <span class="puzzle-theme-tag">⚡ Fork</span>
+                <span class="puzzle-theme-tag">🎯 Pin</span>
+                <span class="puzzle-theme-tag">🏹 Skewer</span>
+                <span class="puzzle-theme-tag">🔍 Discovered Attack</span>
+                <span class="puzzle-theme-tag">🛡️ Deflection</span>
+                <span class="puzzle-theme-tag">👑 Back-Rank Mate</span>
+                <span class="puzzle-theme-tag">✨ Stockfish 16.1 Deep Continuation</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Stats & Rating Card -->
+          <div class="puzzles-landing-sidebar">
+            <div class="glass-panel" style="padding:24px;border-radius:14px;margin-bottom:16px;">
+              <div style="font-size:12px;font-weight:700;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:12px;">Your Tactical Rating</div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:14px;">
+                <span style="font-size:36px;font-weight:800;color:#38bdf8;line-height:1;" id="landing-user-elo">${userRating}</span>
+                <span style="font-size:14px;font-weight:600;color:var(--text-secondary);">ELO</span>
+              </div>
+              <div style="padding-top:12px;border-top:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:13px;color:var(--text-secondary);">Puzzles Solved</span>
+                <strong style="color:#fff;font-size:14px;" id="landing-puzzles-solved">${puzzlesSolved}</strong>
+              </div>
+            </div>
+
+            <!-- ELO Protection & Rules Card -->
+            <div class="glass-panel" style="padding:20px;border-radius:14px;margin-bottom:16px;">
+              <div style="font-size:12px;font-weight:700;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px;">Rating Rules</div>
+              <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.7;">
+                <li><strong style="color:#22c55e;">+1 ELO</strong> per correct solve without hint.</li>
+                <li><strong style="color:#ef4444;">-1 ELO</strong> only if incorrect moves are made or puzzle is abandoned mid-attempt.</li>
+                <li><strong style="color:#38bdf8;">0 ELO change</strong> while on this dashboard.</li>
+                <li>Free board exploration unlocked upon completion.</li>
+              </ul>
+            </div>
+
+            <!-- Quick Import Puzzles Button -->
+            <button type="button" class="btn btn-outline btn-sm btn-block" id="btn-quick-import-puzzles" style="font-size:12px;padding:8px 12px;">
+              ⚡ Bulk Add 1,000 Puzzles / Tier
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    this.bindLandingEvents();
+    this.updateTierCountsUI();
+  },
+
+  bindLandingEvents() {
+    // Difficulty card selection
+    document.querySelectorAll('.diff-tier-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.diff-tier-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        this.currentDifficulty = card.dataset.diff;
+        const lbl = document.getElementById('selected-diff-label');
+        if (lbl) lbl.textContent = this.currentDifficulty;
+      });
+    });
+
+    // Start Puzzle CTA button (Opt-In Initiation)
+    document.getElementById('btn-start-puzzle')?.addEventListener('click', () => {
+      this.startActivePuzzle();
+    });
+
+    // Quick import button
+    document.getElementById('btn-quick-import-puzzles')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btn-quick-import-puzzles');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Importing from Lichess...';
+      }
+      try {
+        const stats = await Api.get('/puzzles/stats/tiers');
+        const currentCount = stats?.easy || 1000;
+        const nextTarget = currentCount + 1000;
+        await Api.post('/puzzles/bulk-import', { targetPerTier: nextTarget });
+        setTimeout(async () => {
+          await this.updateTierCountsUI();
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = '✓ 1,000 Puzzles/Tier Added!';
+            setTimeout(() => { if (btn) btn.textContent = '⚡ Bulk Add 1,000 Puzzles / Tier'; }, 3000);
+          }
+        }, 4000);
+      } catch (err) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '⚡ Bulk Add 1,000 Puzzles / Tier';
+        }
+      }
+    });
+  },
+
+  startActivePuzzle() {
+    this.inActivePuzzle = true;
+    this.renderBoardView();
+    this.loadPuzzle();
+  },
+
+  renderBoardView() {
     const main = document.getElementById('main-content');
     const userRating = Auth.currentUser?.elo_rating || 800;
 
     main.innerHTML = `
       <div class="page">
-        <div class="page-header">
-          <h1 class="page-title">Tactical Puzzles</h1>
-          <p class="page-subtitle">Sharpen your calculation skills with over 4,000+ tactical puzzles (1,000+ per tier) & earn +1 ELO</p>
+        <!-- Top Navigation Bar inside Puzzle solver -->
+        <div class="puzzles-board-header glass-panel">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <button class="btn btn-outline btn-sm" id="btn-puzzles-dashboard">
+              ◀ Puzzles Dashboard
+            </button>
+            <span style="font-weight:700;font-size:14px;color:#fff;">Tactical Puzzle</span>
+            <span class="badge badge-accent" style="text-transform:capitalize;">${this.currentDifficulty}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span id="puzzle-reward-badge" class="badge">Reward: +1</span>
+          </div>
         </div>
 
         <div class="puzzle-container">
@@ -52,7 +285,6 @@ const PuzzlesPage = {
 
             <!-- Puzzle Controls Bar -->
             <div class="puzzle-toolbar">
-              <span id="puzzle-reward-badge" class="badge">Reward: +1</span>
               <button data-action="puzzle-hint" class="btn-blue-sm" id="btn-puzzle-hint">Hint</button>
             </div>
 
@@ -69,33 +301,25 @@ const PuzzlesPage = {
             <div class="glass-panel difficulty-selector mb-2">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                 <h4 style="margin:0;">Difficulty</h4>
-                <span class="badge badge-accent" id="puzzle-pool-badge" style="font-size:11px;">4,000+ Active</span>
+                <span class="badge badge-accent" id="puzzle-pool-badge-sub" style="font-size:11px;">Active</span>
               </div>
               <div class="difficulty-options">
-                <button class="diff-btn" data-diff="easy" style="display:flex;justify-content:space-between;align-items:center;">
+                <button class="diff-btn ${this.currentDifficulty === 'easy' ? 'active' : ''}" data-diff="easy" style="display:flex;justify-content:space-between;align-items:center;">
                   <span>Easy (400 - 999)</span>
-                  <span class="badge badge-subtle" id="count-easy" style="font-size:10px;">1,016</span>
                 </button>
-                <button class="diff-btn active" data-diff="medium" style="display:flex;justify-content:space-between;align-items:center;">
+                <button class="diff-btn ${this.currentDifficulty === 'medium' ? 'active' : ''}" data-diff="medium" style="display:flex;justify-content:space-between;align-items:center;">
                   <span>Medium (1000 - 1399)</span>
-                  <span class="badge badge-subtle" id="count-medium" style="font-size:10px;">1,000</span>
                 </button>
-                <button class="diff-btn" data-diff="hard" style="display:flex;justify-content:space-between;align-items:center;">
+                <button class="diff-btn ${this.currentDifficulty === 'hard' ? 'active' : ''}" data-diff="hard" style="display:flex;justify-content:space-between;align-items:center;">
                   <span>Hard (1400 - 1899)</span>
-                  <span class="badge badge-subtle" id="count-hard" style="font-size:10px;">1,000</span>
                 </button>
-                <button class="diff-btn" data-diff="master" style="display:flex;justify-content:space-between;align-items:center;">
+                <button class="diff-btn ${this.currentDifficulty === 'master' ? 'active' : ''}" data-diff="master" style="display:flex;justify-content:space-between;align-items:center;">
                   <span>Master (1900+)</span>
-                  <span class="badge badge-subtle" id="count-master" style="font-size:10px;">1,000</span>
                 </button>
-                <button class="diff-btn" data-diff="adaptive" style="display:flex;justify-content:space-between;align-items:center;">
+                <button class="diff-btn ${this.currentDifficulty === 'adaptive' ? 'active' : ''}" data-diff="adaptive" style="display:flex;justify-content:space-between;align-items:center;">
                   <span>Adaptive (${userRating} ± 100)</span>
-                  <span class="badge badge-accent" style="font-size:10px;">Dynamic</span>
                 </button>
               </div>
-              <button type="button" class="btn btn-outline btn-sm btn-block mt-2" id="btn-quick-import-puzzles" style="font-size:11px;padding:6px 10px;">
-                ⚡ Bulk Add 1,000 Puzzles / Tier
-              </button>
             </div>
 
             <div class="glass-panel" style="padding:14px;display:flex;gap:8px;">
@@ -107,25 +331,46 @@ const PuzzlesPage = {
       </div>
     `;
 
-    this.bindEvents();
-    this.updateTierCountsUI();
-    this.loadPuzzle();
+    this.bindBoardEvents();
   },
 
-  async updateTierCountsUI() {
-    try {
-      const stats = await Api.get('/puzzles/stats/tiers');
-      if (stats) {
-        if (stats.easy && document.getElementById('count-easy')) document.getElementById('count-easy').textContent = Number(stats.easy).toLocaleString();
-        if (stats.medium && document.getElementById('count-medium')) document.getElementById('count-medium').textContent = Number(stats.medium).toLocaleString();
-        if (stats.hard && document.getElementById('count-hard')) document.getElementById('count-hard').textContent = Number(stats.hard).toLocaleString();
-        if (stats.master && document.getElementById('count-master')) document.getElementById('count-master').textContent = Number(stats.master).toLocaleString();
-        if (stats.total && document.getElementById('puzzle-pool-badge')) document.getElementById('puzzle-pool-badge').textContent = `${Number(stats.total).toLocaleString()} Active`;
+  bindBoardEvents() {
+    // Back to Puzzles Dashboard button with safe ELO protection
+    document.getElementById('btn-puzzles-dashboard')?.addEventListener('click', () => {
+      const isUnfinished = this.inActivePuzzle &&
+        Boolean(this.currentPuzzle || window.puzzleController?.puzzle) &&
+        !this.isFinished &&
+        !window.puzzleController?.isCompleted;
+
+      if (isUnfinished) {
+        const ok = confirm('You are currently solving a puzzle. Leaving now will forfeit the puzzle and you will lose ELO.\n\nAre you sure you want to return to the dashboard?');
+        if (!ok) return;
+
+        // Forfeit puzzle
+        if (this.currentPuzzle) {
+          const puzzleId = this.currentPuzzle.id || this.currentPuzzle.puzzle_id;
+          if (Auth.currentUser && Api && puzzleId) {
+            Api.post(`/puzzles/${puzzleId}/attempt`, {
+              solved: false,
+              reward: -1,
+              penalty_count: 99
+            }).then(res => {
+              if (res && res.new_elo !== undefined) {
+                Auth.currentUser.elo_rating = res.new_elo;
+                Auth.updateUI();
+              }
+            }).catch(() => {});
+          }
+        }
       }
-    } catch (e) {}
-  },
 
-  bindEvents() {
+      this.inActivePuzzle = false;
+      this.isFinished = true;
+      if (window.puzzleController) window.puzzleController.isCompleted = true;
+      if (window.puzzleState) window.puzzleState.isFinished = true;
+      this.renderLandingView();
+    });
+
     const diffBtns = document.querySelectorAll('.diff-btn');
     diffBtns.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -140,33 +385,6 @@ const PuzzlesPage = {
       this.loadPuzzle();
     });
 
-    document.getElementById('btn-quick-import-puzzles')?.addEventListener('click', async () => {
-      const btn = document.getElementById('btn-quick-import-puzzles');
-      if (btn) {
-        btn.disabled = true;
-        btn.textContent = '⏳ Importing from Lichess...';
-      }
-      try {
-        const stats = await Api.get('/puzzles/stats/tiers');
-        const currentCount = stats?.easy || 1000;
-        const nextTarget = currentCount + 1000;
-        await Api.post('/puzzles/bulk-import', { targetPerTier: nextTarget });
-        setTimeout(async () => {
-          await this.updateTierCountsUI();
-          if (btn) {
-            btn.disabled = false;
-            btn.textContent = '✓ 1,000 Puzzles/Tier Added!';
-            setTimeout(() => { if (btn) btn.textContent = '⚡ Bulk Add 1,000 Puzzles / Tier'; }, 3000);
-          }
-        }, 4000);
-      } catch (err) {
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = '⚡ Bulk Add 1,000 Puzzles / Tier';
-        }
-      }
-    });
-
     document.getElementById('btn-puzzle-hint')?.addEventListener('click', (e) => {
       e.preventDefault();
       this.revealHint();
@@ -176,6 +394,19 @@ const PuzzlesPage = {
       e.preventDefault();
       this.revealHint();
     });
+  },
+
+  async updateTierCountsUI() {
+    try {
+      const stats = await Api.get('/puzzles/stats/tiers');
+      if (stats) {
+        if (stats.easy && document.getElementById('count-easy')) document.getElementById('count-easy').textContent = Number(stats.easy).toLocaleString();
+        if (stats.medium && document.getElementById('count-medium')) document.getElementById('count-medium').textContent = Number(stats.medium).toLocaleString();
+        if (stats.hard && document.getElementById('count-hard')) document.getElementById('count-hard').textContent = Number(stats.hard).toLocaleString();
+        if (stats.master && document.getElementById('count-master')) document.getElementById('count-master').textContent = Number(stats.master).toLocaleString();
+        if (stats.total && document.getElementById('puzzle-pool-badge')) document.getElementById('puzzle-pool-badge').textContent = `${Number(stats.total).toLocaleString()} Active`;
+      }
+    } catch (e) {}
   },
 
   async loadPuzzle(seed = Date.now()) {

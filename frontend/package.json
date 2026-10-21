@@ -1,0 +1,12 @@
+{
+  "name": "refrigerator-chess-frontend",
+  "version": "1.0.0",
+  "description": "Refrigerator Chess — Modular Component-Based Frontend",
+  "main": "js/app.js",
+  "scripts": {
+    "start": "echo 'Frontend is static / component-based; run root npm start to boot full stack'",
+    "build": "echo 'No build step required — modular plug-and-play vanilla/ES components'"
+  },
+  "keywords": ["chess", "frontend", "components", "stockfish"],
+  "license": "ISC"
+}
