@@ -229,6 +229,9 @@ const PuzzlesPage = {
 
   startActivePuzzle() {
     this.inActivePuzzle = true;
+    if (window.App && typeof window.App.setSidebarCollapsed === 'function') {
+      window.App.setSidebarCollapsed(true);
+    }
     this.renderBoardView();
     this.loadPuzzle();
   },

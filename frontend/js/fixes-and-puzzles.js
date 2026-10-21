@@ -14,9 +14,9 @@ const MISPLAY_TYPES = new Set(['blunder', 'mistake', 'inaccuracy', 'misplay']);
 /**
  * Helper to update board FEN cleanly
  */
-function renderBoardFromFen(fen) {
+function renderBoardFromFen(fen, lastMove = null) {
   if (window.ChessBoard) {
-    window.ChessBoard.update(fen, { lastMove: null });
+    window.ChessBoard.update(fen, { lastMove });
   }
 }
 
@@ -46,14 +46,15 @@ function syncAnalysisToPly(plyIndex, fens, moves, evaluations) {
   const playedMove = plyIndex > 0 ? moves[plyIndex - 1] : null;
   const currentEval = (evaluations && evaluations[plyIndex]) || { cp: 0, mate: null };
 
-  // 1. Render board at exact ply
-  renderBoardFromFen(currentFen);
+  const from = playedMove ? (playedMove.from || playedMove.uci?.slice(0, 2)) : null;
+  const to = playedMove ? (playedMove.to || playedMove.uci?.slice(2, 4)) : null;
+  const lastMoveObj = (from && to) ? { from, to } : null;
+
+  // 1. Render board at exact ply with persistent lastMove lighting
+  renderBoardFromFen(currentFen, lastMoveObj);
 
   // 2. Highlight & play audio ONLY if a move was played (plyIndex > 0)
   if (playedMove) {
-    const from = playedMove.from || playedMove.uci?.slice(0, 2);
-    const to = playedMove.to || playedMove.uci?.slice(2, 4);
-
     if (from) document.querySelector(`[data-square="${from}"]`)?.classList.add('highlight-analysis');
     if (to) document.querySelector(`[data-square="${to}"]`)?.classList.add('highlight-analysis');
 
@@ -163,7 +164,7 @@ function executeUciMoveOnBoard(uciMove) {
 
 function loadSeededPuzzle(verifiedPuzzles, seed = Date.now()) {
   if (typeof resetBoardVisualState === 'function') {
-    resetBoardVisualState(); // Fixes leftover lit squares in puzzle mode
+    resetBoardVisualState(true); // Complete reset for new puzzle load
   }
 
   const numericSeed = hashSeed(seed);
@@ -204,13 +205,17 @@ function loadSeededPuzzle(verifiedPuzzles, seed = Date.now()) {
   // Play opponent's setup move (moves[0]) after brief visual delay
   const setupMove = puzzleState.currentPuzzle.moves[0];
   setTimeout(() => {
+    const setupFrom = setupMove.slice(0, 2);
+    const setupTo = setupMove.slice(2, 4);
+    if (cb) cb.lastMove = { from: setupFrom, to: setupTo };
     executeUciMoveOnBoard(setupMove);
 
     // Highlight opponent's setup move cleanly
-    const setupFrom = setupMove.slice(0, 2);
-    const setupTo = setupMove.slice(2, 4);
-    document.querySelector(`[data-square="${setupFrom}"]`)?.classList.add('highlight-analysis');
-    document.querySelector(`[data-square="${setupTo}"]`)?.classList.add('highlight-analysis');
+    document.querySelectorAll('.square.last-move-from, .square.last-move-to').forEach(el => {
+      el.classList.remove('last-move-from', 'last-move-to');
+    });
+    document.querySelector(`[data-square="${setupFrom}"]`)?.classList.add('last-move-from');
+    document.querySelector(`[data-square="${setupTo}"]`)?.classList.add('last-move-to');
 
     if (typeof playChessSound === 'function') {
       playChessSound('move');
@@ -294,11 +299,16 @@ function handlePuzzlePlayerMove(fromSq, toSq, promo = '') {
 
   // Correct move: clear old highlights, light up current move, advance solution
   if (typeof resetBoardVisualState === 'function') {
-    resetBoardVisualState();
+    resetBoardVisualState(false);
   }
+  const cb = window.ChessBoard || (typeof ChessBoard !== 'undefined' ? ChessBoard : null);
+  if (cb) cb.lastMove = { from: fromSq, to: toSq };
   executeUciMoveOnBoard(expectedUci);
-  document.querySelector(`[data-square="${fromSq}"]`)?.classList.add('highlight-analysis');
-  document.querySelector(`[data-square="${toSq}"]`)?.classList.add('highlight-analysis');
+  document.querySelectorAll('.square.last-move-from, .square.last-move-to').forEach(el => {
+    el.classList.remove('last-move-from', 'last-move-to');
+  });
+  document.querySelector(`[data-square="${fromSq}"]`)?.classList.add('last-move-from');
+  document.querySelector(`[data-square="${toSq}"]`)?.classList.add('last-move-to');
 
   if (typeof playChessSound === 'function') {
     playChessSound('move');
@@ -313,11 +323,17 @@ function handlePuzzlePlayerMove(fromSq, toSq, promo = '') {
     if (cb) cb.interactive = false;
     setTimeout(() => {
       if (typeof resetBoardVisualState === 'function') {
-        resetBoardVisualState();
+        resetBoardVisualState(false);
       }
+      const replyFrom = replyUci.slice(0, 2);
+      const replyTo = replyUci.slice(2, 4);
+      if (cb) cb.lastMove = { from: replyFrom, to: replyTo };
       executeUciMoveOnBoard(replyUci);
-      document.querySelector(`[data-square="${replyUci.slice(0, 2)}"]`)?.classList.add('highlight-analysis');
-      document.querySelector(`[data-square="${replyUci.slice(2, 4)}"]`)?.classList.add('highlight-analysis');
+      document.querySelectorAll('.square.last-move-from, .square.last-move-to').forEach(el => {
+        el.classList.remove('last-move-from', 'last-move-to');
+      });
+      document.querySelector(`[data-square="${replyFrom}"]`)?.classList.add('last-move-from');
+      document.querySelector(`[data-square="${replyTo}"]`)?.classList.add('last-move-to');
       if (typeof playChessSound === 'function') {
         playChessSound('move');
       }

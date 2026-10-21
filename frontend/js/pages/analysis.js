@@ -13,6 +13,9 @@ const AnalysisPage = {
   activeTab: 'my-matches',
   currentFilter: 'all',
   searchQuery: '',
+  isExploring: false,
+  explorationBasePly: 0,
+  explorationHistory: [],
 
   async render(params = {}) {
     const main = document.getElementById('main-content');
@@ -654,6 +657,17 @@ const AnalysisPage = {
             <button class="btn btn-ghost btn-sm" id="btn-flip" title="Flip Board">🔄 Flip</button>
           </div>
 
+          <!-- Interactive Exploration Bar (Chess.com Style) -->
+          <div id="analysis-exploration-bar" class="analysis-exploration-bar hidden">
+            <div class="exploration-info">
+              <span class="badge badge-accent">EXPLORING VARIATION</span>
+              <span class="exploration-moves" id="exploration-moves-text">1. ...</span>
+            </div>
+            <button class="btn btn-outline btn-xs" id="btn-return-game-line">
+              ↩ Return to Game Line
+            </button>
+          </div>
+
           <!-- Retry Mistake Banner -->
           <div id="retry-banner" class="glass-panel mt-2 hidden" style="padding:14px;border-color:var(--danger);display:flex;justify-content:space-between;align-items:center;">
             <div>
@@ -766,11 +780,14 @@ const AnalysisPage = {
       </div>
     `;
 
-    // Initialize board
+    // Initialize board with interactive moves enabled (Chess.com analysis style)
     ChessBoard.init('board-container', {
       orientation: this.currentGame?.user_color || 'white',
       fen: AppConfig.INITIAL_FEN,
-      interactive: false
+      interactive: true,
+      allowBothColors: true,
+      isAnalysis: true,
+      onMove: (attempt) => this.handleBoardMove(attempt.from, attempt.to, attempt.promotion)
     });
 
     this.renderMovesGrid(moves);
@@ -846,27 +863,201 @@ const AnalysisPage = {
   },
 
   bindAnalysisControls(moves) {
-    document.getElementById('btn-step-start')?.addEventListener('click', () => this.jumpToPly(0));
-    document.getElementById('btn-step-prev')?.addEventListener('click', () => this.jumpToPly(Math.max(0, this.currentPlyIndex - 1)));
-    document.getElementById('btn-step-next')?.addEventListener('click', () => this.jumpToPly(Math.min(this.moves.length, this.currentPlyIndex + 1)));
-    document.getElementById('btn-step-end')?.addEventListener('click', () => this.jumpToPly(this.moves.length));
+    document.getElementById('btn-step-start')?.addEventListener('click', () => {
+      this.exitExploration();
+      this.jumpToPly(0);
+    });
+
+    document.getElementById('btn-step-prev')?.addEventListener('click', () => {
+      this.stepBackward();
+    });
+
+    document.getElementById('btn-step-next')?.addEventListener('click', () => {
+      this.stepForward();
+    });
+
+    document.getElementById('btn-step-end')?.addEventListener('click', () => {
+      this.exitExploration();
+      this.jumpToPly(this.moves.length);
+    });
+
     document.getElementById('btn-flip')?.addEventListener('click', () => ChessBoard.flip());
+
+    // Return to game line button
+    document.getElementById('btn-return-game-line')?.addEventListener('click', () => {
+      const basePly = this.explorationBasePly;
+      this.exitExploration();
+      this.jumpToPly(basePly);
+    });
 
     // Keyboard navigation (Left / Right arrow keys)
     window.onkeydown = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        this.jumpToPly(Math.max(0, this.currentPlyIndex - 1));
+        this.stepBackward();
       }
       if (e.key === 'ArrowRight') {
         e.preventDefault();
-        this.jumpToPly(Math.min(this.moves.length, this.currentPlyIndex + 1));
+        this.stepForward();
       }
     };
   },
 
+  getCurrentBoardFen() {
+    if (this.isExploring && this.explorationHistory.length > 0) {
+      return this.explorationHistory[this.explorationHistory.length - 1].fen;
+    }
+    return this.fens[this.currentPlyIndex] || AppConfig.INITIAL_FEN;
+  },
+
+  handleBoardMove(from, to, promo = '') {
+    const currentFen = this.getCurrentBoardFen();
+    if (!currentFen || typeof window.Chess !== 'function') return false;
+
+    let chess = null;
+    try {
+      chess = new window.Chess(currentFen);
+    } catch (e) {
+      return false;
+    }
+
+    let moveResult = null;
+    try {
+      moveResult = chess.move({ from, to, promotion: promo || 'q' });
+    } catch (e) {
+      return false;
+    }
+
+    if (!moveResult) return false;
+
+    // Check if player played the actual next move of the game review
+    if (!this.isExploring && this.currentPlyIndex < this.moves.length) {
+      const nextGameMove = this.moves[this.currentPlyIndex];
+      const nextFrom = nextGameMove.from || nextGameMove.uci?.slice(0, 2);
+      const nextTo = nextGameMove.to || nextGameMove.uci?.slice(2, 4);
+      if (from === nextFrom && to === nextTo) {
+        // Player played the actual game continuation! Advance review ply
+        this.jumpToPly(this.currentPlyIndex + 1);
+        return true;
+      }
+    }
+
+    // Player made a deviation / alternative line move (Chess.com style exploration)
+    if (!this.isExploring) {
+      this.isExploring = true;
+      this.explorationBasePly = this.currentPlyIndex;
+      this.explorationHistory = [];
+    }
+
+    const newFen = chess.fen();
+    this.explorationHistory.push({
+      from,
+      to,
+      san: moveResult.san,
+      fen: newFen,
+      captured: Boolean(moveResult.captured),
+      inCheck: chess.in_check()
+    });
+
+    // Update board display
+    ChessBoard.update(newFen, {
+      lastMove: { from, to },
+      inCheck: chess.in_check()
+    });
+
+    // Play chess knock sound
+    if (typeof playChessSound === 'function') {
+      const soundType = chess.in_check() ? 'check' : (moveResult.captured ? 'capture' : 'move');
+      playChessSound(soundType);
+    }
+
+    // Update exploration bar UI
+    this.updateExplorationUI();
+
+    // Stream real-time Stockfish MultiPV for the new position!
+    if (typeof runStockfishMultiPV === 'function') {
+      runStockfishMultiPV(newFen, 20);
+    } else if (typeof evaluatePositionWithWorker === 'function') {
+      evaluatePositionWithWorker(newFen);
+    } else if (typeof fetchBackendMultiPV === 'function') {
+      fetchBackendMultiPV(newFen);
+    }
+
+    return true;
+  },
+
+  updateExplorationUI() {
+    const expBar = document.getElementById('analysis-exploration-bar');
+    const expText = document.getElementById('exploration-moves-text');
+    const stepInd = document.getElementById('step-indicator');
+    if (!expBar || !expText) return;
+
+    expBar.classList.remove('hidden');
+
+    // Build SAN move line for the variation
+    let lineStr = '';
+    this.explorationHistory.forEach((m, idx) => {
+      const plyNum = this.explorationBasePly + idx;
+      const moveNum = Math.floor(plyNum / 2) + 1;
+      const isBlack = (plyNum % 2 === 1);
+
+      if (!isBlack) {
+        lineStr += `${moveNum}. ${m.san} `;
+      } else {
+        if (idx === 0) lineStr += `${moveNum}... ${m.san} `;
+        else lineStr += `${m.san} `;
+      }
+    });
+
+    expText.textContent = lineStr.trim();
+    if (stepInd) {
+      stepInd.textContent = `Variation (+${this.explorationHistory.length} ply)`;
+    }
+  },
+
+  exitExploration() {
+    this.isExploring = false;
+    this.explorationHistory = [];
+    const expBar = document.getElementById('analysis-exploration-bar');
+    if (expBar) expBar.classList.add('hidden');
+  },
+
+  stepBackward() {
+    if (this.isExploring && this.explorationHistory.length > 0) {
+      this.explorationHistory.pop();
+      if (this.explorationHistory.length === 0) {
+        const basePly = this.explorationBasePly;
+        this.exitExploration();
+        this.jumpToPly(basePly);
+      } else {
+        const prev = this.explorationHistory[this.explorationHistory.length - 1];
+        ChessBoard.update(prev.fen, {
+          lastMove: { from: prev.from, to: prev.to },
+          inCheck: prev.inCheck
+        });
+        this.updateExplorationUI();
+        if (typeof runStockfishMultiPV === 'function') {
+          runStockfishMultiPV(prev.fen, 20);
+        }
+      }
+    } else {
+      this.jumpToPly(Math.max(0, this.currentPlyIndex - 1));
+    }
+  },
+
+  stepForward() {
+    if (this.isExploring) {
+      const nextPly = this.explorationBasePly + 1;
+      this.exitExploration();
+      this.jumpToPly(Math.min(this.moves.length, nextPly));
+    } else {
+      this.jumpToPly(Math.min(this.moves.length, this.currentPlyIndex + 1));
+    }
+  },
+
   jumpToPly(plyIndex) {
+    this.exitExploration();
     this.currentPlyIndex = plyIndex;
     this.currentMoveIndex = plyIndex - 1;
 

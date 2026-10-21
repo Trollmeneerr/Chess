@@ -22,6 +22,17 @@ const App = {
     // Listen for browser popstate
     window.addEventListener('popstate', () => this.handleRoute());
 
+    // Responsive sidebar collapse on window resize / orientation change
+    window.addEventListener('resize', () => {
+      const isMatchOrPuzzle = (this.currentPage === 'play' || this.currentPage === 'bots' || this.currentPage === 'puzzles');
+      const isMobile = window.innerWidth <= 768;
+      if (isMatchOrPuzzle || isMobile) {
+        this.setSidebarCollapsed(true);
+      } else {
+        this.setSidebarCollapsed(false);
+      }
+    });
+
     // Warn on page unload / refresh if match or puzzle in progress
     window.addEventListener('beforeunload', (e) => {
       if (this.isMatchOrPuzzleInProgress()) {
@@ -192,6 +203,7 @@ const App = {
     // Logo click returns to lobby/home
     document.querySelector('.sidebar-logo')?.addEventListener('click', (e) => {
       e.preventDefault();
+      this.closeSidebarDrawer();
       this.navigateTo('lobby');
     });
 
@@ -199,8 +211,54 @@ const App = {
     document.getElementById('user-panel')?.addEventListener('click', (e) => {
       // Don't navigate if logout button was clicked
       if (e.target.closest('#btn-logout')) return;
+      this.closeSidebarDrawer();
       this.navigateTo('profile');
     });
+
+    // Top-left Arrow toggle button for mobile & match/puzzle drawer
+    document.getElementById('sidebar-toggle-btn')?.addEventListener('click', () => {
+      this.toggleSidebarDrawer();
+    });
+
+    // Tap backdrop to close drawer
+    document.getElementById('sidebar-backdrop')?.addEventListener('click', () => {
+      this.closeSidebarDrawer();
+    });
+
+    // Close drawer on escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') this.closeSidebarDrawer();
+    });
+  },
+
+  toggleSidebarDrawer() {
+    const appEl = document.getElementById('app');
+    if (!appEl) return;
+    appEl.classList.toggle('sidebar-drawer-open');
+  },
+
+  closeSidebarDrawer() {
+    const appEl = document.getElementById('app');
+    if (appEl) {
+      appEl.classList.remove('sidebar-drawer-open');
+    }
+  },
+
+  openSidebarDrawer() {
+    const appEl = document.getElementById('app');
+    if (appEl) {
+      appEl.classList.add('sidebar-drawer-open');
+    }
+  },
+
+  setSidebarCollapsed(collapsed) {
+    const appEl = document.getElementById('app');
+    if (appEl) {
+      appEl.classList.toggle('nav-collapsed', Boolean(collapsed));
+      if (!collapsed) {
+        appEl.classList.remove('sidebar-drawer-open');
+      }
+    }
   },
 
   handleRoute() {
@@ -265,7 +323,19 @@ const App = {
   renderPage(page, params = null) {
     this.currentPage = page;
 
-    // Wipe leftover classes (.highlight-analysis, .highlight-premove, .in-check, .last-move) and SVG arrows
+    // Close any open mobile drawer on route transition
+    this.closeSidebarDrawer();
+
+    // In a match or puzzle, or on mobile screens, collapse navbar out of view with top-left arrow ready
+    const isMatchOrPuzzle = (page === 'play' || page === 'bots' || page === 'puzzles');
+    const isMobile = window.innerWidth <= 768;
+    if (isMatchOrPuzzle || isMobile) {
+      this.setSidebarCollapsed(true);
+    } else {
+      this.setSidebarCollapsed(false);
+    }
+
+    // Wipe leftover classes (.highlight-analysis, .highlight-premove, .in-check) and SVG arrows
     if (typeof resetBoardVisualState === 'function') {
       resetBoardVisualState();
     }

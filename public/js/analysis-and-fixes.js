@@ -22,28 +22,34 @@ window.currentAnalysisFen = null;
 window.activeMultiPV = { 1: null, 2: null, 3: null };
 
 /**
- * 1. CLEAN BOARD RESET ON MODE SWITCH
- * Call this first whenever switching between Play, Analysis, or Puzzle modes.
+ * 1. CLEAN BOARD RESET ON MODE SWITCH / SCREEN TRANSITION
+ * Board squares lighting up for the last move (and check) are preserved during moves!
  */
-function resetBoardVisualState() {
+function resetBoardVisualState(fullReset = false) {
   const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
-  if (svg) svg.querySelectorAll('path, line').forEach(p => p.remove());
+  if (svg) {
+    if (fullReset) {
+      svg.querySelectorAll('path, line').forEach(p => p.remove());
+    } else {
+      svg.querySelectorAll('#notes-arrows-layer path, path[data-note="true"]').forEach(p => p.remove());
+    }
+  }
 
   document.querySelectorAll('.square').forEach(sq => {
     sq.classList.remove(
       'highlight-analysis',
       'highlight-premove',
-      'in-check',
-      'last-move',
-      'last-move-from',
-      'last-move-to',
       'premove-from',
       'premove-to',
       'highlight-green',
+      'note-green',
       'highlight-red',
       'highlight-blue',
       'highlight-cyan'
     );
+    if (fullReset) {
+      sq.classList.remove('in-check', 'last-move', 'last-move-from', 'last-move-to');
+    }
   });
 
   document.querySelectorAll('.chess-piece.is-dragging, .piece.is-dragging').forEach(p => {
@@ -54,9 +60,20 @@ function resetBoardVisualState() {
   document.querySelectorAll('.square-eval-badge').forEach(b => b.remove());
 
   if (window.ChessBoard) {
-    window.ChessBoard.arrows = [];
-    window.ChessBoard.highlightedSquares?.clear();
-    window.ChessBoard.checkSquare = null;
+    if (typeof window.ChessBoard.clearNotes === 'function') {
+      window.ChessBoard.clearNotes();
+    }
+    if (fullReset) {
+      window.ChessBoard.lastMove = null;
+      window.ChessBoard.checkSquare = null;
+      window.ChessBoard.inCheck = false;
+    } else if (window.ChessBoard.lastMove) {
+      // Always ensure board squares lighting up remain displayed!
+      const fromEl = document.querySelector(`[data-square="${window.ChessBoard.lastMove.from}"]`);
+      const toEl = document.querySelector(`[data-square="${window.ChessBoard.lastMove.to}"]`);
+      if (fromEl) fromEl.classList.add('last-move-from');
+      if (toEl) toEl.classList.add('last-move-to');
+    }
   }
 }
 
@@ -136,14 +153,30 @@ function drawMoveArrowFixed(fromSq, toSq, color = '#3b82f6', isBestMove = false)
 
   const cleanColor = color.replace(/[^a-zA-Z0-9]/g, '');
   const markerId = `arrowhead-${cleanColor}`;
-  if (!document.getElementById(markerId)) {
-    const defs = svg.querySelector('defs') || svg.insertBefore(document.createElementNS('http://www.w3.org/2000/svg', 'defs'), svg.firstChild);
-    defs.innerHTML += `
-      <marker id="${markerId}" markerWidth="3.5" markerHeight="3.5" refX="2.2" refY="1.75" orient="auto">
-        <polygon points="0 0, 3.5 1.75, 0 3.5" fill="${color}" />
-      </marker>`;
+
+  let defs = svg.querySelector('defs');
+  if (!defs) {
+    defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    svg.insertBefore(defs, svg.firstChild);
   }
 
+  let marker = svg.querySelector(`#${markerId}`);
+  if (!marker) {
+    marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+    marker.setAttribute('id', markerId);
+    marker.setAttribute('markerWidth', '4');
+    marker.setAttribute('markerHeight', '4');
+    marker.setAttribute('refX', '2.6');
+    marker.setAttribute('refY', '2');
+    marker.setAttribute('orient', 'auto');
+    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    poly.setAttribute('points', '0 0.5, 3.8 2, 0 3.5');
+    poly.setAttribute('fill', color);
+    marker.appendChild(poly);
+    defs.appendChild(marker);
+  }
+
+  const isNote = (color === '#22c55e');
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   const isKnight = (Math.abs(dx) === 1 && Math.abs(dy) === 2) || (Math.abs(dx) === 2 && Math.abs(dy) === 1);
 
@@ -157,25 +190,49 @@ function drawMoveArrowFixed(fromSq, toSq, color = '#3b82f6', isBestMove = false)
 
   path.setAttribute('fill', 'none');
   path.setAttribute('stroke', color);
-  path.setAttribute('stroke-width', isBestMove ? '20' : '16');
+  path.setAttribute('stroke-width', isBestMove ? '20' : (isNote ? '14' : '16'));
   path.setAttribute('stroke-linecap', 'round');
   path.setAttribute('stroke-linejoin', 'round');
   path.setAttribute('opacity', '0.88');
   path.setAttribute('marker-end', `url(#${markerId})`);
-  svg.appendChild(path);
+  if (isNote) {
+    path.setAttribute('data-note', 'true');
+  } else {
+    path.setAttribute('data-engine', 'true');
+  }
+
+  const targetLayer = isNote
+    ? (svg.querySelector('#notes-arrows-layer') || svg.querySelector('#arrows-list') || svg)
+    : (svg.querySelector('#engine-arrows-layer') || svg.querySelector('#arrows-list') || svg);
+
+  targetLayer.appendChild(path);
+
+  // Preserve engine arrows in ChessBoard state so they persist across board re-renders
+  if (!isNote && window.ChessBoard) {
+    if (!window.ChessBoard.engineArrows) window.ChessBoard.engineArrows = [];
+    if (!window.ChessBoard.engineArrows.some(a => a.from === fromSq && a.to === toSq && a.color === color)) {
+      window.ChessBoard.engineArrows.push({ from: fromSq, to: toSq, color, isBestMove });
+    }
+  }
 }
 
-// Right-Click Arrow Drawing: ONLY render when letting go (mouseup)
+// Right-Click Note Drawing: Green arrows and green square notes
 document.addEventListener('mousedown', (e) => {
   const sqEl = e.target.closest('.square');
   if (e.button === 2 && sqEl) {
     window.arrowStartSquare = sqEl.dataset.square;
   } else if (e.button === 0) {
     if (e.target.closest('input, textarea, select, button, .modal, .chat-panel')) return;
+    // Left click on board: Clear user notes only (green arrows and green squares)
     const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
-    if (svg) svg.querySelectorAll('path, line').forEach(p => p.remove());
-    if (!sqEl) {
-      resetBoardVisualState();
+    if (svg) {
+      svg.querySelectorAll('#notes-arrows-layer path, path[data-note="true"]').forEach(p => p.remove());
+    }
+    document.querySelectorAll('.highlight-green, .note-green').forEach(el => {
+      el.classList.remove('highlight-green', 'note-green');
+    });
+    if (window.ChessBoard) {
+      window.ChessBoard.clearNotes?.();
     }
   }
 });
@@ -189,14 +246,27 @@ document.addEventListener('mouseup', (e) => {
   if (floating) floating.remove();
 
   if (e.button === 2 && window.arrowStartSquare) {
+    // If board.js has an active rightDrag, it handles arrow/square notes natively without double-toggling
+    if (window.ChessBoard && window.ChessBoard.rightDrag) {
+      return;
+    }
     const sqEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('.square');
     if (sqEl) {
       const arrowEndSquare = sqEl.dataset.square;
       if (window.arrowStartSquare !== arrowEndSquare) {
-        drawMoveArrowFixed(window.arrowStartSquare, arrowEndSquare, '#3b82f6', false);
+        // Green note arrow
+        if (window.ChessBoard && typeof window.ChessBoard.toggleNoteArrow === 'function') {
+          window.ChessBoard.toggleNoteArrow(window.arrowStartSquare, arrowEndSquare);
+        } else {
+          drawMoveArrowFixed(window.arrowStartSquare, arrowEndSquare, '#22c55e', false);
+        }
       } else {
-        // Toggle square highlight
-        sqEl.classList.toggle('highlight-green');
+        // Toggle green square note
+        if (window.ChessBoard && typeof window.ChessBoard.toggleNoteSquare === 'function') {
+          window.ChessBoard.toggleNoteSquare(arrowEndSquare);
+        } else {
+          sqEl.classList.toggle('highlight-green');
+        }
       }
     }
     window.arrowStartSquare = null;
@@ -336,9 +406,10 @@ function updateEvaluationBar(cp = 0, mate = null) {
 /**
  * 7. ENGINE TOP 3 LINES (MultiPV = 3 Parser)
  */
-function updateEngineLineUI(multipvIndex, scoreText, pvMovesString) {
+function updateEngineLineUI(multipvIndex, scoreText, pvMovesString, rawUciString = '') {
   const lineEl = document.querySelector(`.engine-line[data-multipv="${multipvIndex}"]`);
   if (!lineEl) return;
+  if (rawUciString) lineEl.dataset.uci = rawUciString;
   const evalEl = lineEl.querySelector('.line-eval');
   if (evalEl) {
     evalEl.textContent = scoreText;
@@ -353,14 +424,20 @@ function updateEngineLineUI(multipvIndex, scoreText, pvMovesString) {
     movesEl.textContent = pvMovesString;
   }
 
-  // Bind click on line to trigger audio and preview arrow
+  // Bind click on line to trigger audio and preview arrow / play move in analysis
   if (!lineEl._clickBound) {
     lineEl._clickBound = true;
     lineEl.addEventListener('click', () => {
       playChessSound('move');
-      const firstMove = pvMovesString.split(' ')[0];
-      if (firstMove && firstMove.length >= 4) {
-        drawMoveArrowFixed(firstMove.slice(0, 2), firstMove.slice(2, 4), '#3b82f6', true);
+      const uciStr = lineEl.dataset.uci || '';
+      const firstUci = uciStr.split(' ')[0] || '';
+      if (firstUci && firstUci.length >= 4) {
+        const from = firstUci.slice(0, 2);
+        const to = firstUci.slice(2, 4);
+        drawMoveArrowFixed(from, to, '#3b82f6', true);
+        if (window.AnalysisPage && window.AnalysisPage.isExploring !== undefined) {
+          window.AnalysisPage.handleBoardMove(from, to, firstUci[4] || '');
+        }
       }
     });
   }
@@ -494,7 +571,7 @@ function handleStockfishWorkerMessage(line) {
     const pvString = formatPVToAlgebraic(pvMovesMatch[1].trim());
 
     // Update UI badge and line moves
-    updateEngineLineUI(pvIndex, scoreText, pvString);
+    updateEngineLineUI(pvIndex, scoreText, pvString, pvMovesMatch[1].trim());
 
     // If top line (multipv 1), update evaluation bar and puzzle post-continuation preview!
     if (pvIndex === 1) {
@@ -557,7 +634,8 @@ async function fetchBackendMultiPV(fen) {
           scoreText = l.score > 0 ? `+${pawns}` : pawns;
         }
         const pvStr = Array.isArray(l.pv) ? l.pv.slice(0, 8).join(' ') : (l.pv || '');
-        updateEngineLineUI(l.pvNum, scoreText, pvStr);
+        const rawUciStr = Array.isArray(l.pv) ? l.pv.join(' ') : (l.pv || '');
+        updateEngineLineUI(l.pvNum, scoreText, pvStr, rawUciStr);
 
         if (l.pvNum === 1) {
           updateEvaluationBar(scoreType === 'cp' ? Math.round(l.score * 100) : 0, scoreType === 'mate' ? l.score : null);

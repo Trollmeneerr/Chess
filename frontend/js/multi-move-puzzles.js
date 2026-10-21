@@ -88,6 +88,10 @@ function startSeededMultiMovePuzzle(puzzlePool, seed = Date.now()) {
     window.PuzzlesPage.isFinished = false;
   }
 
+  if (typeof resetBoardVisualState === 'function') {
+    resetBoardVisualState(true);
+  }
+
   updatePuzzleRewardBadge();
 
   // Reset continuation box and feedback
@@ -462,8 +466,17 @@ function triggerPuzzleHint() {
 
 function highlightMoveSquares(uciMove) {
   if (!uciMove || uciMove.length < 4) return;
-  document.querySelector('[data-square="' + uciMove.slice(0, 2) + '"]')?.classList.add('highlight-analysis');
-  document.querySelector('[data-square="' + uciMove.slice(2, 4) + '"]')?.classList.add('highlight-analysis');
+  const from = uciMove.slice(0, 2);
+  const to = uciMove.slice(2, 4);
+  const cb = window.ChessBoard || (typeof ChessBoard !== 'undefined' ? ChessBoard : null);
+  if (cb) {
+    cb.lastMove = { from, to };
+  }
+  document.querySelectorAll('.square.last-move-from, .square.last-move-to').forEach(el => {
+    el.classList.remove('last-move-from', 'last-move-to');
+  });
+  document.querySelector('[data-square="' + from + '"]')?.classList.add('last-move-from');
+  document.querySelector('[data-square="' + to + '"]')?.classList.add('last-move-to');
 }
 
 function executeUciMoveOnBoard(uciMove) {

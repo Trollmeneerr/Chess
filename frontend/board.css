@@ -265,13 +265,14 @@ body:not(.dragging-active) .square .piece {
   color: var(--board-light, #eae9d2);
 }
 
-/* Last move highlight - Chess.com soft warm amber */
+/* Last move highlight - Always display board squares lighting up */
 .square.last-move-from::before,
 .square.last-move-to::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(245, 158, 11, 0.32);
+  background: rgba(245, 158, 11, 0.34) !important;
+  box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.55);
   pointer-events: none;
   z-index: 1;
 }
@@ -355,31 +356,35 @@ body:not(.dragging-active) .square .piece {
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* Right-click annotations */
-.square.highlight-green::before {
+/* Right-click annotations (Notes handled separately from move highlights) */
+.square.highlight-green:not(.legal-move):not(.legal-capture)::after,
+.square.note-green:not(.legal-move):not(.legal-capture)::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(34, 197, 94, 0.32);
+  background: rgba(34, 197, 94, 0.36);
+  box-shadow: inset 0 0 0 2px rgba(34, 197, 94, 0.75);
   pointer-events: none;
   z-index: 2;
 }
 
-.square.highlight-cyan::before,
-.square.highlight-blue::before {
+.square.highlight-cyan::after,
+.square.highlight-blue::after {
   content: '';
   position: absolute;
   inset: 0;
   background: rgba(59, 130, 246, 0.35);
+  box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.75);
   pointer-events: none;
   z-index: 2;
 }
 
-.square.highlight-red::before {
+.square.highlight-red::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(239, 68, 68, 0.32);
+  background: rgba(239, 68, 68, 0.35);
+  box-shadow: inset 0 0 0 2px rgba(239, 68, 68, 0.75);
   pointer-events: none;
   z-index: 2;
 }
@@ -703,6 +708,43 @@ body:not(.dragging-active) .square .piece {
 .acc-val.blue-badge { background: #3b82f6; color: #fff; }
 .review-cta { text-align: center; margin-bottom: 12px; display: flex; flex-direction: column; align-items: center; text-decoration: none; padding: 10px 16px; border-radius: 8px; }
 .review-cta span { font-size: 0.75rem; opacity: 0.85; }
-.post-game-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .post-game-actions button { border: none; cursor: pointer; text-align: center; font-weight: 700; padding: 9px 12px; border-radius: 6px; }
+
+/* Analysis Interactive Exploration Bar (Chess.com Style) */
+.analysis-exploration-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  margin-top: 10px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 12px rgba(56, 189, 248, 0.2);
+  gap: 12px;
+  animation: fadeIn 0.2s ease;
+  width: 100%;
+}
+
+.analysis-exploration-bar.hidden {
+  display: none !important;
+}
+
+.analysis-exploration-bar .exploration-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.analysis-exploration-bar .exploration-moves {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  font-weight: 600;
+  color: #38bdf8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 

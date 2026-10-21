@@ -17,8 +17,10 @@ const ChessBoard = {
   lastMove: null,
   inCheck: false,
   checkSquare: null,
-  highlightedSquares: new Map(), // square -> 'green' | 'red' | 'blue' | 'yellow'
-  arrows: [], // array of { from, to }
+  notes: { arrows: [], squares: new Set() },
+  highlightedSquares: new Set(),
+  arrows: [], // array of { from, to } notes
+  engineArrows: [], // array of { from, to, color, isBestMove }
   rightDrag: null, // { from, startX, startY }
   boundDocEvents: false,
   onMove: null, // callback(move) => { from, to, promotion }
@@ -35,12 +37,17 @@ const ChessBoard = {
     window.isBoardFlipped = this.orientation === 'black';
     this.interactive = options.interactive !== false;
     this.allowPremove = options.allowPremove !== false;
+    this.allowBothColors = Boolean(options.allowBothColors || options.isAnalysis);
+    this.isAnalysis = Boolean(options.isAnalysis);
     this.showToolbar = options.showToolbar !== false;
     this.onMove = options.onMove || null;
     this.fen = options.fen || AppConfig.INITIAL_FEN;
     this.premove = null;
-    this.arrows = [];
-    this.highlightedSquares.clear();
+    this.notes = { arrows: [], squares: new Set() };
+    this.highlightedSquares = this.notes.squares;
+    this.arrows = this.notes.arrows;
+    this.engineArrows = [];
+    if (options.lastMove !== undefined) this.lastMove = options.lastMove;
     this.render();
     this.bindEvents();
     this.setupResizeObserver();
@@ -117,6 +124,9 @@ const ChessBoard = {
    * Check if it is currently this player's active turn
    */
   isMyTurn() {
+    if (this.allowBothColors || this.isAnalysis || this.playerColor === 'both') {
+      return true;
+    }
     const turn = this.getTurn();
     return (this.playerColor === 'white' && turn === 'w') || (this.playerColor === 'black' && turn === 'b');
   },
@@ -126,6 +136,9 @@ const ChessBoard = {
    */
   isPlayerPiece(piece) {
     if (!piece) return false;
+    if (this.allowBothColors || this.isAnalysis || this.playerColor === 'both') {
+      return true;
+    }
     return this.playerColor === 'white' ? piece === piece.toUpperCase() : piece === piece.toLowerCase();
   },
 
@@ -201,8 +214,8 @@ const ChessBoard = {
         }
 
         // Custom right-click square highlights
-        if (this.highlightedSquares.has(sq)) {
-          classes += ` highlight-${this.highlightedSquares.get(sq)}`;
+        if (this.highlightedSquares && this.highlightedSquares.has && this.highlightedSquares.has(sq)) {
+          classes += ' highlight-green note-green';
         }
 
         // In-square coordinates (Chess.com style)
@@ -228,6 +241,8 @@ const ChessBoard = {
     html += `
       <svg class="board-arrows-layer" id="board-arrows" viewBox="0 0 800 800" preserveAspectRatio="none">
         <defs></defs>
+        <g id="engine-arrows-layer"></g>
+        <g id="notes-arrows-layer"></g>
         <g id="arrows-list"></g>
         <g id="arrow-preview"></g>
       </svg>
@@ -259,12 +274,14 @@ const ChessBoard = {
    */
   update(fen, options = {}) {
     this.fen = fen;
-    if (options.lastMove) this.lastMove = options.lastMove;
+    if (options.lastMove !== undefined) this.lastMove = options.lastMove;
     if (options.inCheck !== undefined) this.inCheck = options.inCheck;
     if (options.checkSquare !== undefined) this.checkSquare = options.checkSquare;
     this.selectedSquare = null;
     this.legalMoves = [];
-    this.clearAnnotations();
+    if (options.clearNotes) {
+      this.clearNotes();
+    }
 
     // Check if an existing premove can now execute
     if (this.premove && this.isMyTurn()) {
@@ -581,9 +598,9 @@ const ChessBoard = {
       return;
     }
 
-    // Left-click: Clear annotations & start drag
+    // Left-click: Clear user notes (green arrows/squares) & start drag
     if (e.button === 0) {
-      this.clearAnnotations();
+      this.clearNotes();
 
       const piece = this.getPieceAt(square);
       const myTurn = this.isMyTurn();
@@ -618,12 +635,9 @@ const ChessBoard = {
       const targetSq = el?.dataset.square || this.rightDrag.from;
 
       if (targetSq === this.rightDrag.from) {
-        this.toggleSquareHighlight(targetSq);
+        this.toggleNoteSquare(targetSq);
       } else {
-        if (typeof window.drawMoveArrowFixed === 'function') {
-          window.drawMoveArrowFixed(this.rightDrag.from, targetSq, '#3b82f6', false);
-        }
-        this.toggleArrow(this.rightDrag.from, targetSq);
+        this.toggleNoteArrow(this.rightDrag.from, targetSq);
       }
       this.rightDrag = null;
       window.arrowStartSquare = null;
@@ -772,55 +786,114 @@ const ChessBoard = {
   },
 
   renderArrows() {
+    this.renderNotes();
+    this.renderEngineArrows();
+  },
+
+  renderEngineArrows() {
     const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
     if (!svg) return;
-    svg.querySelectorAll('path, line').forEach(p => p.remove());
-    for (const arrow of this.arrows) {
+    const engineLayer = svg.querySelector('#engine-arrows-layer');
+    if (engineLayer) {
+      engineLayer.innerHTML = '';
+    } else {
+      svg.querySelectorAll('path[data-engine="true"]').forEach(p => p.remove());
+    }
+    for (const arrow of (this.engineArrows || [])) {
+      if (typeof window.drawMoveArrowFixed === 'function') {
+        window.drawMoveArrowFixed(arrow.from, arrow.to, arrow.color || '#3b82f6', arrow.isBestMove || false);
+      }
+    }
+  },
+
+  renderNotes() {
+    const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
+    if (!svg) return;
+    const notesLayer = svg.querySelector('#notes-arrows-layer');
+    if (notesLayer) {
+      notesLayer.innerHTML = '';
+    } else {
+      svg.querySelectorAll('path[data-note="true"]').forEach(p => p.remove());
+    }
+    for (const arrow of (this.notes?.arrows || this.arrows || [])) {
       drawMoveArrow(arrow.from, arrow.to, '#22c55e', false);
     }
   },
 
   renderArrowPreview(fromSq, toSq) {
-    // Live preview during right-click drag
-    this.renderArrows();
-    drawMoveArrow(fromSq, toSq, '#38bdf8', false);
+    this.renderNotes();
+    drawMoveArrow(fromSq, toSq, '#22c55e', false);
   },
 
   clearArrowPreview() {
-    this.renderArrows();
+    this.renderNotes();
+  },
+
+  toggleNoteArrow(from, to) {
+    if (!this.notes) this.notes = { arrows: [], squares: new Set() };
+    const arrows = this.notes.arrows;
+    const idx = arrows.findIndex(a => a.from === from && a.to === to);
+    if (idx >= 0) {
+      arrows.splice(idx, 1);
+    } else {
+      arrows.push({ from, to });
+    }
+    this.arrows = arrows;
+    this.renderNotes();
   },
 
   toggleArrow(from, to) {
-    const idx = this.arrows.findIndex(a => a.from === from && a.to === to);
-    if (idx >= 0) {
-      this.arrows.splice(idx, 1);
+    this.toggleNoteArrow(from, to);
+  },
+
+  toggleNoteSquare(square) {
+    if (!this.notes) this.notes = { arrows: [], squares: new Set() };
+    const squares = this.notes.squares;
+    const sqEl = this.boardEl?.querySelector(`.square[data-square="${square}"]`);
+    if (squares.has(square)) {
+      squares.delete(square);
+      sqEl?.classList.remove('highlight-green', 'note-green');
     } else {
-      this.arrows.push({ from, to });
+      squares.add(square);
+      sqEl?.classList.add('highlight-green');
     }
-    this.renderArrows();
+    this.highlightedSquares = squares;
   },
 
   toggleSquareHighlight(square) {
-    const sqEl = this.boardEl?.querySelector(`.square[data-square="${square}"]`);
-    if (this.highlightedSquares.has(square)) {
-      this.highlightedSquares.delete(square);
-      sqEl?.classList.remove('highlight-green');
-    } else {
-      this.highlightedSquares.set(square, 'green');
-      sqEl?.classList.add('highlight-green');
+    this.toggleNoteSquare(square);
+  },
+
+  clearNotes() {
+    if (!this.notes) this.notes = { arrows: [], squares: new Set() };
+    this.notes.arrows = [];
+    this.notes.squares.clear();
+    this.arrows = [];
+    this.highlightedSquares = this.notes.squares;
+    const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
+    if (svg) {
+      const notesLayer = svg.querySelector('#notes-arrows-layer');
+      if (notesLayer) notesLayer.innerHTML = '';
+      svg.querySelectorAll('path[data-note="true"]').forEach(p => p.remove());
+    }
+    this.boardEl?.querySelectorAll('.highlight-green, .note-green').forEach(el => {
+      el.classList.remove('highlight-green', 'note-green');
+    });
+  },
+
+  clearEngineArrows() {
+    this.engineArrows = [];
+    const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
+    if (svg) {
+      const engineLayer = svg.querySelector('#engine-arrows-layer');
+      if (engineLayer) engineLayer.innerHTML = '';
+      svg.querySelectorAll('path[data-engine="true"]').forEach(p => p.remove());
     }
   },
 
   clearAnnotations() {
-    this.arrows = [];
-    const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
-    if (svg) svg.querySelectorAll('path, line').forEach(p => p.remove());
-    if (this.highlightedSquares.size > 0) {
-      this.highlightedSquares.clear();
-      this.boardEl?.querySelectorAll('.highlight-green, .highlight-blue, .highlight-cyan, .highlight-red').forEach(el => {
-        el.classList.remove('highlight-green', 'highlight-blue', 'highlight-cyan', 'highlight-red');
-      });
-    }
+    this.clearNotes();
+    this.clearEngineArrows();
   },
 
   /**
@@ -1141,22 +1214,13 @@ function drawMoveArrow(fromSq, toSq, color = '#3b82f6', isBestMove = false) {
  * 2. Clear Arrows & Premoves on Screen Click
  */
 function clearAnnotationsAndPremoves() {
-  if (typeof window.resetBoardVisualState === 'function') {
-    window.resetBoardVisualState();
-  }
-  const svg = document.getElementById('board-arrows') || document.getElementById('board-arrows-svg');
-  if (svg) svg.querySelectorAll('path, line').forEach(p => p.remove());
-  document.querySelectorAll('.highlight-analysis, .highlight-premove, .square-eval-badge, .highlight-green, .highlight-cyan, .highlight-red, .premove-from, .premove-to').forEach(el => {
-    if (el.classList.contains('square-eval-badge')) {
-      el.remove();
-    } else {
-      el.classList.remove('highlight-analysis', 'highlight-premove', 'highlight-green', 'highlight-cyan', 'highlight-red', 'premove-from', 'premove-to');
-    }
-  });
   if (window.ChessBoard) {
-    window.ChessBoard.clearAnnotations();
-    window.ChessBoard.clearPremove();
+    window.ChessBoard.clearNotes?.();
+    window.ChessBoard.clearPremove?.();
   }
+  document.querySelectorAll('.highlight-green, .note-green, .highlight-cyan, .highlight-red, .premove-from, .premove-to').forEach(el => {
+    el.classList.remove('highlight-green', 'note-green', 'highlight-cyan', 'highlight-red', 'premove-from', 'premove-to');
+  });
   window.queuedPremove = null;
 }
 
