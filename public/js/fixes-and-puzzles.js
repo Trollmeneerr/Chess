@@ -41,9 +41,11 @@ function syncAnalysisToPly(plyIndex, fens, moves, evaluations) {
     resetBoardVisualState();
   }
 
-  const currentFen = fens[plyIndex] || (window.AppConfig ? window.AppConfig.INITIAL_FEN : 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
-  const preMoveFen = fens[Math.max(0, plyIndex - 1)]; // Board state BEFORE the move
-  const playedMove = plyIndex > 0 ? moves[plyIndex - 1] : null;
+  const fenList = Array.isArray(fens) ? fens : [];
+  const moveList = Array.isArray(moves) ? moves : [];
+  const currentFen = fenList[plyIndex] || (window.AppConfig ? window.AppConfig.INITIAL_FEN : 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+  const preMoveFen = fenList[Math.max(0, plyIndex - 1)]; // Board state BEFORE the move
+  const playedMove = plyIndex > 0 ? moveList[plyIndex - 1] : null;
   const currentEval = (evaluations && evaluations[plyIndex]) || { cp: 0, mate: null };
 
   const from = playedMove ? (playedMove.from || playedMove.uci?.slice(0, 2)) : null;
@@ -110,7 +112,7 @@ function createSeededPRNG(seedNumber) {
 function hashSeed(seed) {
   if (typeof seed === 'number') return seed >>> 0;
   let hash = 0;
-  const str = String(seed);
+  const str = String(seed || Date.now());
   for (let i = 0; i < str.length; i++) {
     hash = ((hash << 5) - hash) + str.charCodeAt(i);
     hash |= 0;
@@ -137,13 +139,23 @@ function executeUciMoveOnBoard(uciMove) {
 
   const cb = window.ChessBoard || (typeof ChessBoard !== 'undefined' ? ChessBoard : null);
   if (cb) {
-    const curFen = cb.fen || (puzzleState.currentPuzzle ? puzzleState.currentPuzzle.fen : null);
+    const curFen = cb.fen || (puzzleState.currentPuzzle ? puzzleState.currentPuzzle.fen : (window.puzzleController?.puzzle?.fen || null));
     if (typeof window.Chess === 'function' && curFen) {
       try {
         const c = new window.Chess(curFen);
-        c.move({ from, to, promotion: promo });
-        cb.update(c.fen(), { lastMove: { from, to } });
-        return;
+        let moveRes = null;
+        try {
+          moveRes = c.move(promo ? { from, to, promotion: promo } : { from, to });
+        } catch (e) {}
+        if (!moveRes && !promo) {
+          try {
+            moveRes = c.move({ from, to, promotion: 'q' });
+          } catch (e) {}
+        }
+        if (moveRes) {
+          cb.update(c.fen(), { lastMove: { from, to } });
+          return;
+        }
       } catch (err) {
         // Continue to fallback
       }
@@ -170,18 +182,22 @@ function loadSeededPuzzle(verifiedPuzzles, seed = Date.now()) {
   const numericSeed = hashSeed(seed);
   const rand = createSeededPRNG(numericSeed);
   const puzzleList = (verifiedPuzzles && verifiedPuzzles.length > 0) ? verifiedPuzzles : VERIFIED_PUZZLES;
+  if (!puzzleList || puzzleList.length === 0) return;
   const pickIndex = Math.floor(rand() * puzzleList.length);
   const puzzle = puzzleList[pickIndex];
+  if (!puzzle) return;
 
   // Standardize moves array (support space-delimited string or array)
-  const moves = Array.isArray(puzzle.moves) ? puzzle.moves : puzzle.moves.trim().split(/\s+/);
+  const moves = Array.isArray(puzzle.moves) ? puzzle.moves : (typeof puzzle.moves === 'string' ? puzzle.moves.trim().split(/\s+/) : []);
   puzzleState.currentPuzzle = { ...puzzle, moves };
   puzzleState.solutionIndex = 1;
   puzzleState.penaltyCount = 0;
   puzzleState.reward = 1;
+  puzzleState.isFinished = false;
   if (window.PuzzlesPage) {
     window.PuzzlesPage.inActivePuzzle = true;
     window.PuzzlesPage.isFinished = false;
+    window.PuzzlesPage.currentPuzzle = puzzleState.currentPuzzle;
   }
   updatePuzzleRewardUI();
 
@@ -204,7 +220,10 @@ function loadSeededPuzzle(verifiedPuzzles, seed = Date.now()) {
 
   // Play opponent's setup move (moves[0]) after brief visual delay
   const setupMove = puzzleState.currentPuzzle.moves[0];
+  if (!setupMove) return;
   setTimeout(() => {
+    if (puzzleState.isFinished || (window.PuzzlesPage && !window.PuzzlesPage.inActivePuzzle)) return;
+
     const setupFrom = setupMove.slice(0, 2);
     const setupTo = setupMove.slice(2, 4);
     if (cb) cb.lastMove = { from: setupFrom, to: setupTo };
@@ -262,7 +281,7 @@ function updatePuzzleRewardUI() {
 }
 
 function handlePuzzlePlayerMove(fromSq, toSq, promo = '') {
-  if (!puzzleState.currentPuzzle) return false;
+  if (!puzzleState.currentPuzzle || puzzleState.isFinished) return false;
 
   const expectedUci = puzzleState.currentPuzzle.moves[puzzleState.solutionIndex];
   if (!expectedUci) return false;
@@ -271,7 +290,9 @@ function handlePuzzlePlayerMove(fromSq, toSq, promo = '') {
   const expectedBase = expectedUci.toLowerCase();
 
   // Check move match
-  if (playedUci.slice(0, 4) !== expectedBase.slice(0, 4)) {
+  const matchesBase = playedUci.slice(0, 4) === expectedBase.slice(0, 4);
+  const matchesPromo = expectedBase.length <= 4 || !promo || playedUci === expectedBase;
+  if (!matchesBase || !matchesPromo) {
     // Wrong move: apply penalty (0 then -1) and snap piece back
     applyPuzzlePenalty();
 
@@ -289,10 +310,14 @@ function handlePuzzlePlayerMove(fromSq, toSq, promo = '') {
     // Snap piece back to its original square
     const cb = window.ChessBoard || (typeof ChessBoard !== 'undefined' ? ChessBoard : null);
     if (cb) {
-      cb.selectedSquare = null;
-      cb.legalMoves = [];
-      cb.render();
-      cb.bindEvents();
+      if (typeof cb.snapBack === 'function') {
+        cb.snapBack();
+      } else {
+        cb.selectedSquare = null;
+        cb.legalMoves = [];
+        cb.render();
+        cb.bindEvents();
+      }
     }
     return false;
   }
@@ -318,10 +343,10 @@ function handlePuzzlePlayerMove(fromSq, toSq, promo = '') {
 
   // Auto-play opponent response if more moves remain
   const replyUci = puzzleState.currentPuzzle.moves[puzzleState.solutionIndex];
-  const cb = window.ChessBoard || (typeof ChessBoard !== 'undefined' ? ChessBoard : null);
   if (replyUci) {
     if (cb) cb.interactive = false;
     setTimeout(() => {
+      if (puzzleState.isFinished || (window.PuzzlesPage && !window.PuzzlesPage.inActivePuzzle)) return;
       if (typeof resetBoardVisualState === 'function') {
         resetBoardVisualState(false);
       }
@@ -376,17 +401,22 @@ function onPuzzleFinishedSuccessfully() {
 
   // Submit attempt to server if user is logged in
   if (window.Auth && window.Auth.currentUser && window.Api && puzzleState.currentPuzzle) {
-    window.Api.post(`/puzzles/${puzzleState.currentPuzzle.id}/attempt`, {
-      solved: true,
-      reward: puzzleState.reward,
-      penalty_count: puzzleState.penaltyCount
-    }).then(res => {
-      if (res && res.new_elo !== undefined) {
-        window.Auth.currentUser.elo_rating = res.new_elo;
-        window.Auth.currentUser.puzzles_solved = res.puzzles_solved;
-        window.Auth.updateUI();
-      }
-    }).catch(() => {});
+    const puzzleId = puzzleState.currentPuzzle.id || puzzleState.currentPuzzle.puzzle_id;
+    if (puzzleId) {
+      window.Api.post(`/puzzles/${puzzleId}/attempt`, {
+        solved: true,
+        reward: puzzleState.reward,
+        penalty_count: puzzleState.penaltyCount
+      }).then(res => {
+        if (res && res.new_elo !== undefined) {
+          window.Auth.currentUser.elo_rating = res.new_elo;
+          window.Auth.currentUser.puzzles_solved = res.puzzles_solved;
+          if (typeof window.Auth.updateUI === 'function') {
+            window.Auth.updateUI();
+          }
+        }
+      }).catch(() => {});
+    }
   }
 }
 
@@ -394,8 +424,13 @@ function onPuzzleFinishedSuccessfully() {
  * 3. PUZZLE HINT: PENALIZE SCORE, LIGHT UP PIECE SQUARE & DRAW BLUE ARROW
  */
 function requestPuzzleHint() {
-  if (!puzzleState.currentPuzzle) return;
-  const expectedUci = puzzleState.currentPuzzle.moves[puzzleState.solutionIndex];
+  const puzzle = puzzleState.currentPuzzle || window.puzzleController?.puzzle;
+  if (!puzzle) return;
+  const moves = Array.isArray(puzzle.moves)
+    ? puzzle.moves
+    : (puzzle.movesUci || (typeof puzzle.moves === 'string' ? puzzle.moves.trim().split(/\s+/) : []));
+  const idx = puzzleState.currentPuzzle ? puzzleState.solutionIndex : (window.puzzleController?.stepIndex || 1);
+  const expectedUci = moves[idx];
   if (!expectedUci) return;
 
   applyPuzzlePenalty(); // Counts same as mistake (0 on first, -1 on second)
@@ -410,6 +445,8 @@ function requestPuzzleHint() {
   document.querySelector(`[data-square="${fromSq}"]`)?.classList.add('highlight-analysis');
   if (typeof drawMoveArrowFixed === 'function') {
     drawMoveArrowFixed(fromSq, toSq, '#3b82f6', true);
+  } else if (typeof window.drawMoveArrow === 'function') {
+    window.drawMoveArrow(fromSq, toSq, '#3b82f6', true);
   }
 
   const feedback = document.getElementById('puzzle-feedback');
@@ -444,7 +481,11 @@ document.addEventListener('click', (e) => {
     'open-puzzles':       () => (window.App ? window.App.navigateTo('puzzles') : window.location.assign('/puzzles')),
     'open-profile':       () => (window.App ? window.App.navigateTo('profile', btn.dataset.profile || undefined) : window.location.assign('/profile')),
     'open-leaderboard':   () => (window.App ? window.App.navigateTo('leaderboard') : window.location.assign('/leaderboard')),
-    'puzzle-hint':        () => (typeof triggerPuzzleHint === 'function' ? triggerPuzzleHint() : requestPuzzleHint()),
+    'puzzle-hint':        () => {
+      if (e.defaultPrevented) return;
+      if (typeof triggerPuzzleHint === 'function') triggerPuzzleHint();
+      else requestPuzzleHint();
+    },
     'request-rematch':    () => (typeof requestRematch === 'function' ? requestRematch() : null),
     'show-login':         () => (window.Auth && typeof window.Auth.showLoginModal === 'function' && window.Auth.showLoginModal()),
     'show-register':      () => (window.Auth && typeof window.Auth.showRegisterModal === 'function' && window.Auth.showRegisterModal()),
