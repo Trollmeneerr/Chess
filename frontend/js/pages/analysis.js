@@ -36,6 +36,10 @@ const AnalysisPage = {
    * Render Match Selector View
    */
   async renderSelectorView() {
+    this.currentAnalysis = null;
+    if (window.App && typeof window.App.setSidebarCollapsed === 'function') {
+      window.App.setSidebarCollapsed(false);
+    }
     const main = document.getElementById('main-content');
     main.innerHTML = `
       <div class="page review-selector-wrap">
@@ -563,6 +567,10 @@ const AnalysisPage = {
    * Render Active Game Review View
    */
   renderAnalysisView(data) {
+    this.currentAnalysis = data;
+    if (window.App && typeof window.App.setSidebarCollapsed === 'function') {
+      window.App.setSidebarCollapsed(true);
+    }
     document.getElementById('analysis-loading')?.classList.add('hidden');
     const workspace = document.getElementById('analysis-workspace');
     workspace.classList.remove('hidden');
@@ -1307,6 +1315,16 @@ const AnalysisPage = {
   escapeHtml(str) {
     if (!str) return '';
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  },
+
+  cleanup() {
+    this.currentAnalysis = null;
+    this.pgn = '';
+    this.currentGame = null;
+    this.isExploring = false;
+    if (window.App && typeof window.App.setSidebarCollapsed === 'function') {
+      window.App.setSidebarCollapsed(false);
+    }
   }
 };
 

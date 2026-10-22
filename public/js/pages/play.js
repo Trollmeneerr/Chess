@@ -26,6 +26,9 @@ const PlayPage = {
   },
 
   renderSetup() {
+    if (window.App && typeof window.App.setSidebarCollapsed === 'function') {
+      window.App.setSidebarCollapsed(false);
+    }
     const main = document.getElementById('main-content');
     const isLoggedIn = !!Auth.currentUser;
 

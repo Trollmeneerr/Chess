@@ -33,7 +33,7 @@
   color: var(--cyan);
   text-align: center;
   padding: 3px 6px;
-  background: #111726;
+  background: rgba(10, 25, 48, 0.85);
   border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: 6px;
   min-width: 38px;
@@ -47,7 +47,7 @@
   border-radius: 6px;
   overflow: hidden;
   position: relative;
-  background: #1e293b; /* Black side */
+  background: #030b18; /* Black side */
   border: 1px solid rgba(56, 189, 248, 0.35);
   box-shadow: 0 0 16px rgba(56, 189, 248, 0.15), inset 0 2px 6px rgba(0, 0, 0, 0.55);
 }
@@ -85,7 +85,7 @@
   overflow: hidden;
   position: relative;
   aspect-ratio: 1 / 1;
-  background: #0f172a;
+  background: #030b18;
   border: 2px solid rgba(56, 189, 248, 0.4);
   box-shadow: 
     0 0 0 1px rgba(56, 189, 248, 0.15),
@@ -115,12 +115,8 @@
   }
 }
 
-/* Blue Chess.com Theme & Board Mechanics */
+/* Board Mechanics Variables */
 :root {
-  --bg-main: #0f172a;
-  --bg-panel: #1e293b;
-  --accent-blue: #3b82f6;
-  --accent-blue-hover: #2563eb;
   --board-light: #eae9d2;
   --board-dark: #4b7399;
 }
@@ -205,7 +201,7 @@ body:not(.dragging-active) .square .piece {
   appearance: none;
   width: 110px;
   height: 5px;
-  background: #1e293b;
+  background: rgba(13, 140, 241, 0.25);
   border-radius: 999px;
   outline: none;
   cursor: pointer;
@@ -784,7 +780,7 @@ body:not(.dragging-active) .square .piece {
 .eval-bar {
   width: 26px;
   height: 100%;
-  background: #1e293b; /* Black advantage side */
+  background: #030b18; /* Black advantage side */
   border-radius: 4px;
   overflow: hidden;
   position: relative;

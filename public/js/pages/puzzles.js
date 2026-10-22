@@ -22,6 +22,9 @@ const PuzzlesPage = {
 
   renderLandingView() {
     this.inActivePuzzle = false;
+    if (window.App && typeof window.App.setSidebarCollapsed === 'function') {
+      window.App.setSidebarCollapsed(false);
+    }
     const main = document.getElementById('main-content');
     const userRating = Auth.currentUser?.elo_rating || 800;
     const puzzlesSolved = Auth.currentUser?.puzzles_solved || 0;

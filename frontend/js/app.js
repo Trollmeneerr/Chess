@@ -24,12 +24,12 @@ const App = {
 
     // Responsive sidebar collapse on window resize / orientation change
     window.addEventListener('resize', () => {
-      const isMatchOrPuzzle = (this.currentPage === 'play' || this.currentPage === 'bots' || this.currentPage === 'puzzles');
       const isMobile = window.innerWidth <= 768;
-      if (isMatchOrPuzzle || isMobile) {
-        this.setSidebarCollapsed(true);
-      } else {
+      if (!isMobile) {
         this.setSidebarCollapsed(false);
+      } else {
+        const gameStarted = this.isGameOrPuzzleOrAnalysisStarted();
+        this.setSidebarCollapsed(gameStarted);
       }
     });
 
@@ -41,6 +41,9 @@ const App = {
         return e.returnValue;
       }
     });
+
+    // Initialize top scroll progress bar
+    this.initScrollProgress();
   },
 
   isMatchOrPuzzleInProgress() {
@@ -66,6 +69,20 @@ const App = {
       !window.puzzleController?.isCompleted;
 
     return Boolean(isPvpActive || isBotActive || isPuzzleActive);
+  },
+
+  isGameOrPuzzleOrAnalysisStarted() {
+    if (this.isMatchOrPuzzleInProgress()) return true;
+
+    // Check if active game review analysis board is loaded
+    if (this.currentPage === 'analysis') {
+      const workspace = document.getElementById('analysis-workspace');
+      if (workspace && !workspace.classList.contains('hidden') && window.AnalysisPage?.currentAnalysis) {
+        return true;
+      }
+    }
+
+    return false;
   },
 
   confirmLeaveActiveMatchOrPuzzle(destinationPage) {
@@ -215,8 +232,13 @@ const App = {
       this.navigateTo('profile');
     });
 
-    // Top-left Arrow toggle button for mobile & match/puzzle drawer
-    document.getElementById('sidebar-toggle-btn')?.addEventListener('click', () => {
+    // Top-left Arrow toggle button for mobile when game/puzzle/analysis is started
+    document.getElementById('sidebar-toggle-btn')?.addEventListener('click', (e) => {
+      if (window.innerWidth > 768) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       this.toggleSidebarDrawer();
     });
 
@@ -232,6 +254,7 @@ const App = {
   },
 
   toggleSidebarDrawer() {
+    if (window.innerWidth > 768) return; // Never toggle on desktop
     const appEl = document.getElementById('app');
     if (!appEl) return;
     appEl.classList.toggle('sidebar-drawer-open');
@@ -245,6 +268,7 @@ const App = {
   },
 
   openSidebarDrawer() {
+    if (window.innerWidth > 768) return; // Never open on desktop
     const appEl = document.getElementById('app');
     if (appEl) {
       appEl.classList.add('sidebar-drawer-open');
@@ -252,12 +276,20 @@ const App = {
   },
 
   setSidebarCollapsed(collapsed) {
+    const isMobile = window.innerWidth <= 768;
     const appEl = document.getElementById('app');
-    if (appEl) {
-      appEl.classList.toggle('nav-collapsed', Boolean(collapsed));
-      if (!collapsed) {
-        appEl.classList.remove('sidebar-drawer-open');
-      }
+    if (!appEl) return;
+
+    if (!isMobile) {
+      // NEVER collapse on desktop
+      appEl.classList.remove('nav-collapsed');
+      appEl.classList.remove('sidebar-drawer-open');
+      return;
+    }
+
+    appEl.classList.toggle('nav-collapsed', Boolean(collapsed));
+    if (!collapsed) {
+      appEl.classList.remove('sidebar-drawer-open');
     }
   },
 
@@ -326,13 +358,14 @@ const App = {
     // Close any open mobile drawer on route transition
     this.closeSidebarDrawer();
 
-    // In a match or puzzle, or on mobile screens, collapse navbar out of view with top-left arrow ready
-    const isMatchOrPuzzle = (page === 'play' || page === 'bots' || page === 'puzzles');
+    // On desktop, keep sidebar navigation open at all times.
+    // On mobile, only collapse sidebar when a game, puzzle, or analysis is started.
     const isMobile = window.innerWidth <= 768;
-    if (isMatchOrPuzzle || isMobile) {
-      this.setSidebarCollapsed(true);
-    } else {
+    if (!isMobile) {
       this.setSidebarCollapsed(false);
+    } else {
+      const willDirectlyStartGame = (page === 'play' && params) || (page === 'analysis' && params && (params.pgn || params.inviteCode));
+      this.setSidebarCollapsed(Boolean(willDirectlyStartGame));
     }
 
     // Wipe leftover classes (.highlight-analysis, .highlight-premove, .in-check) and SVG arrows
@@ -382,6 +415,62 @@ const App = {
 
     // Scroll to top of content
     window.scrollTo(0, 0);
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) mainContent.scrollTop = 0;
+    this.updateScrollProgress?.();
+  },
+
+  initScrollProgress() {
+    const bar = document.getElementById('scrollProgressBar');
+    const container = document.getElementById('scrollProgressContainer');
+    const mainContent = document.querySelector('.main-content');
+    if (!bar) return;
+
+    this.updateScrollProgress = () => {
+      let scrollTop = 0;
+      let scrollHeight = 0;
+      let clientHeight = 0;
+
+      if (mainContent && mainContent.scrollHeight > mainContent.clientHeight) {
+        scrollTop = mainContent.scrollTop;
+        scrollHeight = mainContent.scrollHeight;
+        clientHeight = mainContent.clientHeight;
+      } else {
+        scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+        scrollHeight = document.documentElement.scrollHeight || document.body.scrollHeight || 0;
+        clientHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      }
+
+      const totalScroll = scrollHeight - clientHeight;
+      const progress = totalScroll > 0 ? (scrollTop / totalScroll) * 100 : 0;
+      bar.style.width = `${Math.min(100, Math.max(0, progress))}%`;
+    };
+
+    if (mainContent) {
+      mainContent.addEventListener('scroll', this.updateScrollProgress, { passive: true });
+    }
+    window.addEventListener('scroll', this.updateScrollProgress, { passive: true });
+    window.addEventListener('resize', this.updateScrollProgress, { passive: true });
+
+    if (container) {
+      container.addEventListener('click', (e) => {
+        const rect = container.getBoundingClientRect();
+        const clickRatio = (e.clientX - rect.left) / rect.width;
+        if (mainContent && mainContent.scrollHeight > mainContent.clientHeight) {
+          mainContent.scrollTo({
+            top: clickRatio * (mainContent.scrollHeight - mainContent.clientHeight),
+            behavior: 'smooth'
+          });
+        } else {
+          window.scrollTo({
+            top: clickRatio * (document.documentElement.scrollHeight - window.innerHeight),
+            behavior: 'smooth'
+          });
+        }
+      });
+    }
+
+    this.updateScrollProgress();
   }
 };
 
